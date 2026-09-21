@@ -4,12 +4,12 @@ export type ThemePreference = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
 export const THEME_COLORS = {
-  light: "#f1efe8",
+  light: "#ffffff",
   dark: "#0b0c0e",
 } as const;
 
 export const THEME_SWATCHES = {
-  light: { rail: "#ebe8e0", surface: "#faf9f5", ink: "#2a3038" },
+  light: { rail: "#ffffff", surface: "#ffffff", ink: "#2a3038" },
   dark: { rail: "#0e0f12", surface: "#141518", ink: "#c5ccd6" },
 } as const;
 
@@ -18,7 +18,7 @@ export const THEME_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
-  { id: "light", label: "Daylight", hint: "Warm paper, graphite ink" },
+  { id: "light", label: "White", hint: "White canvas, graphite ink" },
   { id: "dark", label: "Nightline", hint: "Steel on charcoal" },
   { id: "system", label: "System", hint: "Follow the device" },
 ];

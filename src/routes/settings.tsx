@@ -43,7 +43,7 @@ function AppearancePanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Daylight is warm paper and graphite. Nightline is the original steel desk. System follows the device.
+        White is a clean canvas with graphite ink. Nightline is the original steel desk. System follows the device.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {THEME_OPTIONS.map((opt) => {

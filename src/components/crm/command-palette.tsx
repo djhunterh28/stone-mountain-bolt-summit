@@ -65,7 +65,6 @@ const PAGES = [
   { label: "Guest lists", to: "/guests" },
   { label: "Floor plan designer", to: "/floorplans" },
   { label: "Reviews & reputation", to: "/reviews" },
-  { label: "Freelance gigs", to: "/gigs" },
   { label: "Event hand-off", to: "/handoff" },
   { label: "Directory", to: "/discover" },
 ];

@@ -12,7 +12,7 @@ import { resolveTheme, type ThemePreference } from "@/lib/crm/theme";
 import { cn } from "@/lib/utils";
 
 const ITEMS: { id: ThemePreference; label: string; icon: typeof Sun }[] = [
-  { id: "light", label: "Daylight", icon: Sun },
+  { id: "light", label: "White", icon: Sun },
   { id: "dark", label: "Nightline", icon: Moon },
   { id: "system", label: "System", icon: Monitor },
 ];
