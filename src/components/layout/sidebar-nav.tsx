@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BarChart3,
-  Box,
   Bot,
   Calendar,
   CalendarRange,
@@ -92,7 +91,6 @@ export const STAFF_MORE: NavItem[] = [
   { href: "/handoff", label: "Hand-off", icon: Handshake },
   { href: "/discover", label: "Directory", icon: Compass },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/products", label: "Products", icon: Box },
   { href: "/automations", label: "Automations", icon: Workflow },
   { href: "/sequences", label: "Sequences", icon: Zap },
   { href: "/leadbooster", label: "LeadBooster", icon: Bot },
