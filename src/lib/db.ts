@@ -1,6 +1,6 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 
-/** Which database backend is active. Northline CRM schema through 0035 (member prefs). */
+/** Which database backend is active. Northline CRM schema through 0036 (Google Meet). */
 export type DbSource = "neon" | "pglite";
 
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean

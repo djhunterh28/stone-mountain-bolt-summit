@@ -4,7 +4,7 @@ import { iso } from "@/lib/utils";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { insertOutbound } from "./domain";
 
-export type ScheduleProvider = "calendly" | "tidycal" | "acuity" | "zoom";
+export type ScheduleProvider = "calendly" | "tidycal" | "acuity" | "zoom" | "meet";
 
 export type ScheduleConnection = {
   id: number;
@@ -15,6 +15,7 @@ export type ScheduleConnection = {
   tokenHint: string | null;
   connected: boolean;
   autoZoom: boolean;
+  autoMeet: boolean;
   confirmEmail: boolean;
   lastSync: string | null;
 };
@@ -49,13 +50,15 @@ export type ScheduleBooking = {
   zoomMeetingId: string | null;
   zoomJoinUrl: string | null;
   zoomPasscode: string | null;
+  meetCode: string | null;
+  meetJoinUrl: string | null;
   confirmationSentAt: string | null;
   calendlyEventUri: string | null;
 };
 
 function asProvider(v: unknown): ScheduleProvider {
   const p = String(v);
-  if (p === "tidycal" || p === "acuity" || p === "zoom" || p === "calendly") return p;
+  if (p === "tidycal" || p === "acuity" || p === "zoom" || p === "calendly" || p === "meet") return p;
   return "calendly";
 }
 
@@ -67,9 +70,27 @@ function eventUrl(provider: ScheduleProvider, handle: string, slug: string) {
 
 function tokenPrefix(provider: ScheduleProvider) {
   if (provider === "zoom") return "zm";
+  if (provider === "meet") return "gmt";
   if (provider === "tidycal") return "td";
   if (provider === "acuity") return "aq";
   return "cal";
+}
+
+export function mintMeet(seed: string) {
+  let n = 0;
+  for (let i = 0; i < seed.length; i++) n = (n * 33 + seed.charCodeAt(i)) >>> 0;
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  const chunk = (len: number, salt: number) => {
+    let s = "";
+    let x = n + salt;
+    for (let i = 0; i < len; i++) {
+      s += letters[x % 26];
+      x = Math.imul(x, 17) >>> 0;
+    }
+    return s;
+  };
+  const code = `${chunk(3, 3)}-${chunk(4, 11)}-${chunk(3, 29)}`;
+  return { code, join: `https://meet.google.com/${code}` };
 }
 
 function mintZoom(seed: string) {
@@ -114,9 +135,11 @@ async function fulfillBooking(sql: Sql, bookingId: number) {
       ? []
       : await sql.query(`select * from scheduling_connections where member_id = $1 and connected = true`, [memberId]);
   const zoomConn = connections.find((c) => String(c.provider) === "zoom");
+  const meetConn = connections.find((c) => String(c.provider) === "meet");
   const calConn = connections.find((c) => String(c.provider) === "calendly");
   const confirm = connections.length === 0 || connections.some((c) => Boolean(c.confirm_email));
   const autoZoom = Boolean(zoomConn) && (zoomConn ? Boolean(zoomConn.auto_zoom) : true);
+  const autoMeet = Boolean(meetConn) && (meetConn ? Boolean(meetConn.auto_meet ?? true) : true);
   const duration = Number(b.duration_min ?? b.link_duration ?? 30);
   const title = String(b.link_name ?? "Northline consult");
   const hostName = b.host_name == null ? "Northline" : String(b.host_name);
