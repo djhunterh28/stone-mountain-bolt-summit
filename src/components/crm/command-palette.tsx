@@ -29,6 +29,7 @@ const PAGES = [
   { label: "Forms", to: "/forms" },
   { label: "Prospector", to: "/prospector" },
   { label: "Scheduler", to: "/scheduler" },
+  { label: "Google Meet", to: "/integrations" },
   { label: "Marketplace", to: "/settings?tab=marketplace" },
   { label: "Forecast", to: "/forecast" },
   { label: "Display boards", to: "/boards" },

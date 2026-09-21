@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { iso } from "@/lib/utils";
+import { mintMeet } from "./schedule";
 
 export type PlaceHit = {
   placeId: string;
@@ -248,4 +249,21 @@ export const createDealZoom = createServerFn({ method: "POST" })
     );
     await sql.query(`update integration_status set last_ok = now() where provider = 'zoom'`);
     return { ok: true as const, join, pass };
+  });
+
+export const createDealMeet = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { dealId: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const deal = (await sql.query(`select id, title, owner_id from deals where id = $1`, [data.dealId]))[0];
+    if (!deal) return { ok: false as const, error: "Deal not found" };
+    const m = mintMeet(`deal:${data.dealId}:${Date.now()}`);
+    await sql.query(
+      `insert into activities (type, subject, owner_id, deal_id, duration_min, notes, due_at)
+       values ('meeting', $1, $2, $3, 30, $4, now() + interval '1 day')`,
+      [`Google Meet — ${String(deal.title)}`, deal.owner_id == null ? 1 : Number(deal.owner_id), data.dealId, `Join ${m.join} · code ${m.code}`],
+    );
+    await sql.query(`update integration_status set last_ok = now() where provider = 'google_meet'`);
+    return { ok: true as const, join: m.join, code: m.code };
   });

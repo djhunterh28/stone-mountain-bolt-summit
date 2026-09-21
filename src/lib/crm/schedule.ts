@@ -151,25 +151,35 @@ async function fulfillBooking(sql: Sql, bookingId: number) {
   let zoomId = b.zoom_meeting_id == null ? null : String(b.zoom_meeting_id);
   let zoomJoin = b.zoom_join_url == null ? null : String(b.zoom_join_url);
   let zoomPass = b.zoom_passcode == null ? null : String(b.zoom_passcode);
+  let meetCode = b.meet_code == null ? null : String(b.meet_code);
+  let meetJoin = b.meet_join_url == null ? null : String(b.meet_join_url);
 
+  if (autoMeet && !meetJoin) {
+    const m = mintMeet(`${bookingId}:${starts}:${guestEmail}`);
+    meetCode = m.code;
+    meetJoin = m.join;
+  }
   if (autoZoom && !zoomJoin) {
     const z = mintZoom(`${bookingId}:${starts}:${guestEmail}`);
     zoomId = z.id;
     zoomJoin = z.join;
     zoomPass = z.pass;
-    await sql.query(
-      `update bookings set zoom_meeting_id = $1, zoom_join_url = $2, zoom_passcode = $3, duration_min = $4, status = 'confirmed' where id = $5`,
-      [zoomId, zoomJoin, zoomPass, duration, bookingId],
-    );
-  } else {
-    await sql.query(`update bookings set duration_min = $1, status = 'confirmed' where id = $2`, [duration, bookingId]);
   }
+
+  await sql.query(
+    `update bookings set zoom_meeting_id = $1, zoom_join_url = $2, zoom_passcode = $3,
+       meet_code = $4, meet_join_url = $5, duration_min = $6, status = 'confirmed' where id = $7`,
+    [zoomId, zoomJoin, zoomPass, meetCode, meetJoin, duration, bookingId],
+  );
 
   if (confirm) {
     const when = nyStamp(starts);
     const first = guest.split(" ")[0] ?? guest;
-    const zoomLine = zoomJoin ? `Zoom: ${zoomJoin}  (passcode ${zoomPass})` : "We will send a venue call sheet separately.";
-    const body = `Hi ${first} —\n\nYou are confirmed with ${hostName} for ${title} on ${when} ET (${duration} min).\n\n${zoomLine}\n\nReply to this thread if the hold moves. The Gowanus shop is on 718-555-0140.\n\n— ${hostName}\nHurricane Productions`;
+    const rooms: string[] = [];
+    if (meetJoin) rooms.push(`Google Meet: ${meetJoin}`);
+    if (zoomJoin) rooms.push(`Zoom: ${zoomJoin}  (passcode ${zoomPass})`);
+    const roomLine = rooms.length ? rooms.join("\n") : "We will send a venue call sheet separately.";
+    const body = `Hi ${first} —\n\nYou are confirmed with ${hostName} for ${title} on ${when} ET (${duration} min).\n\n${roomLine}\n\nReply to this thread if the hold moves. The Gowanus shop is on 718-555-0140.\n\n— ${hostName}\nHurricane Productions`;
     await insertOutbound(sql, {
       purpose: "workflow",
       mailKind: "transactional",
@@ -188,7 +198,7 @@ async function fulfillBooking(sql: Sql, bookingId: number) {
     [
       memberId ?? 1,
       `${guest} booked ${title}`,
-      `${nyStamp(starts)} · ${guestEmail}${zoomJoin ? " · Zoom created" : ""}`,
+      `${nyStamp(starts)} · ${guestEmail}${meetJoin ? " · Meet created" : ""}${zoomJoin ? " · Zoom created" : ""}`,
     ],
   );
 
@@ -199,6 +209,8 @@ async function fulfillBooking(sql: Sql, bookingId: number) {
   return {
     zoomJoinUrl: zoomJoin,
     zoomPasscode: zoomPass,
+    meetJoinUrl: meetJoin,
+    meetCode,
     hostName,
     startsAt: starts,
     durationMin: duration,
@@ -217,6 +229,7 @@ function mapConnection(r: Record<string, unknown>): ScheduleConnection {
     tokenHint: r.token_hint == null ? null : String(r.token_hint),
     connected: Boolean(r.connected),
     autoZoom: Boolean(r.auto_zoom),
+    autoMeet: r.auto_meet == null ? true : Boolean(r.auto_meet),
     confirmEmail: Boolean(r.confirm_email),
     lastSync: iso(r.last_sync),
   };
@@ -241,6 +254,8 @@ function mapBooking(r: Record<string, unknown>): ScheduleBooking {
     zoomMeetingId: r.zoom_meeting_id == null ? null : String(r.zoom_meeting_id),
     zoomJoinUrl: r.zoom_join_url == null ? null : String(r.zoom_join_url),
     zoomPasscode: r.zoom_passcode == null ? null : String(r.zoom_passcode),
+    meetCode: r.meet_code == null ? null : String(r.meet_code),
+    meetJoinUrl: r.meet_join_url == null ? null : String(r.meet_join_url),
     confirmationSentAt: iso(r.confirmation_sent_at),
     calendlyEventUri: r.calendly_event_uri == null ? null : String(r.calendly_event_uri),
   };
@@ -313,7 +328,7 @@ export const connectScheduler = createServerFn({ method: "POST" })
         [data.memberId, data.provider, handle, hint],
       );
     }
-    if (data.provider !== "zoom") await importEventTypes(sql, data.memberId, handle, data.provider);
+    if (data.provider !== "zoom" && data.provider !== "meet") await importEventTypes(sql, data.memberId, handle, data.provider);
     return { ok: true as const };
   });
 
@@ -401,7 +416,7 @@ export const syncScheduler = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { memberId: number; provider: ScheduleProvider }) => input)
   .handler(async ({ data }) => {
-    if (data.provider === "zoom") return { ok: true as const, pulled: 0 };
+    if (data.provider === "zoom" || data.provider === "meet") return { ok: true as const, pulled: 0 };
     const sql = await getSql();
     const conn = (
       await sql.query(
@@ -417,13 +432,15 @@ export const syncScheduler = createServerFn({ method: "POST" })
 
 export const toggleConnection = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { id: number; connected?: boolean; autoZoom?: boolean; confirmEmail?: boolean }) => input)
+  .validator((input: { id: number; connected?: boolean; autoZoom?: boolean; autoMeet?: boolean; confirmEmail?: boolean }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
     if (data.connected != null)
       await sql.query(`update scheduling_connections set connected = $1 where id = $2`, [data.connected, data.id]);
     if (data.autoZoom != null)
       await sql.query(`update scheduling_connections set auto_zoom = $1 where id = $2`, [data.autoZoom, data.id]);
+    if (data.autoMeet != null)
+      await sql.query(`update scheduling_connections set auto_meet = $1 where id = $2`, [data.autoMeet, data.id]);
     if (data.confirmEmail != null)
       await sql.query(`update scheduling_connections set confirm_email = $1 where id = $2`, [data.confirmEmail, data.id]);
     return { ok: true };
@@ -452,4 +469,16 @@ export const createZoomMeeting = createServerFn({ method: "POST" })
       [z.id, z.join, z.pass, data.id],
     );
     return { ok: true as const, join: z.join, pass: z.pass };
+  });
+
+export const createMeetMeeting = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const b = (await sql`select * from bookings where id = ${data.id}`)[0];
+    if (!b) return { ok: false as const, error: "Booking not found" };
+    const m = mintMeet(`force:${data.id}:${iso(b.starts_at)}`);
+    await sql.query(`update bookings set meet_code = $1, meet_join_url = $2 where id = $3`, [m.code, m.join, data.id]);
+    return { ok: true as const, join: m.join, code: m.code };
   });

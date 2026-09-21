@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listDeals } from "@/lib/crm/server";
 import {
+  createDealMeet,
   createDealZoom,
   listIntegrationStatus,
   listShowTracks,
@@ -28,6 +29,7 @@ const LABELS: Record<string, string> = {
   tidycal: "TidyCal",
   acuity: "Acuity",
   zoom: "Zoom",
+  google_meet: "Google Meet",
   deezer: "Deezer",
   google_places: "Google Places",
 };
@@ -42,7 +44,7 @@ function IntegrationsPage() {
     <div className="pb-12">
       <PageHeader
         title="Integrations"
-        subtitle="Calendly, TidyCal, Acuity, Zoom, Deezer, and Google Places on the same desk."
+        subtitle="Calendly, TidyCal, Acuity, Zoom, Google Meet, Deezer, and Google Places on the same desk."
       />
       <div className="grid gap-3 px-4 sm:grid-cols-3 sm:px-6">
         {(status.data?.rows ?? []).map((r) => (
@@ -79,10 +81,11 @@ function IntegrationsPage() {
             <TabsTrigger value="places">Google Places</TabsTrigger>
             <TabsTrigger value="music">Deezer</TabsTrigger>
             <TabsTrigger value="zoom">Zoom</TabsTrigger>
+            <TabsTrigger value="meet">Google Meet</TabsTrigger>
           </TabsList>
           <TabsContent value="schedule" className="mt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Per-user Calendly, TidyCal, and Acuity connections live on Scheduler. Confirmed holds mint Zoom and send mail.
+              Per-user Calendly, TidyCal, and Acuity connections live on Scheduler. Confirmed holds mint Google Meet or Zoom and send mail.
             </p>
             <Button asChild size="sm" variant="secondary">
               <Link to="/scheduler">Open scheduler connections</Link>
@@ -108,6 +111,22 @@ function IntegrationsPage() {
               }
             >
               Create Zoom for this deal
+            </Button>
+          </TabsContent>
+          <TabsContent value="meet" className="mt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Create a Google Meet space from the selected event. The join URL lands on a calendar activity.
+            </p>
+            <Button
+              size="sm"
+              onClick={() =>
+                createDealMeet({ data: { dealId } }).then((r) => {
+                  if (!r.ok) toast.error(r.error);
+                  else toast.success(`Meet ${r.join}`);
+                })
+              }
+            >
+              Create Meet for this deal
             </Button>
           </TabsContent>
         </Tabs>

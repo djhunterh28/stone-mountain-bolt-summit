@@ -119,7 +119,7 @@ function IntegrationsPanel() {
         </p>
       </article>
       <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
-        <h3 className="text-sm font-medium">Calendly, TidyCal, Acuity & Zoom</h3>
+        <h3 className="text-sm font-medium">Calendly, TidyCal, Acuity, Zoom & Google Meet</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Per-user scheduling plus Deezer and Google Places live on Integrations.
         </p>

@@ -835,6 +835,8 @@ export const listScheduler = createServerFn({ method: "GET" }).handler(async () 
     durationMin: b.duration_min == null ? undefined : Number(b.duration_min),
     zoomJoinUrl: b.zoom_join_url == null ? null : String(b.zoom_join_url),
     zoomPasscode: b.zoom_passcode == null ? null : String(b.zoom_passcode),
+    meetJoinUrl: b.meet_join_url == null ? null : String(b.meet_join_url),
+    meetCode: b.meet_code == null ? null : String(b.meet_code),
     confirmationSentAt: iso(b.confirmation_sent_at),
     calendlyEventUri: b.calendly_event_uri == null ? null : String(b.calendly_event_uri),
   }));

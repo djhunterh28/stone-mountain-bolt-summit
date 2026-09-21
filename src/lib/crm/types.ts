@@ -399,6 +399,8 @@ export type Booking = {
   durationMin?: number;
   zoomJoinUrl?: string | null;
   zoomPasscode?: string | null;
+  meetJoinUrl?: string | null;
+  meetCode?: string | null;
   confirmationSentAt?: string | null;
   calendlyEventUri?: string | null;
   hostName?: string | null;

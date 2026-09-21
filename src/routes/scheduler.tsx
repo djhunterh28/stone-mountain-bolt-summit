@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { bookSlot, getBootstrap, listScheduler } from "@/lib/crm/server";
 import {
   connectScheduler,
+  createMeetMeeting,
   createZoomMeeting,
   getSchedulingDesk,
   resendConfirmation,
@@ -50,7 +51,7 @@ function SchedulerPage() {
     <div className="pb-12">
       <PageHeader
         title="Scheduler"
-        subtitle="Calendly, Zoom, and confirmation mail on the same consults that land in the pipeline."
+        subtitle="Calendly, Zoom, Google Meet, and confirmation mail on the same consults that land in the pipeline."
       />
       <div className="px-4 sm:px-6">
         <Tabs defaultValue="bookings">
@@ -87,6 +88,27 @@ function SchedulerPage() {
                     <p className="text-xs text-muted-foreground">{b.guestEmail}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {b.meetJoinUrl ? (
+                      <Button size="sm" variant="secondary" asChild>
+                        <a href={b.meetJoinUrl} target="_blank" rel="noreferrer">
+                          Meet
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          createMeetMeeting({ data: { id: b.id } }).then((r) => {
+                            if (r.ok) toast.success("Google Meet created");
+                            else toast.error(r.error);
+                            refresh();
+                          })
+                        }
+                      >
+                        Create Meet
+                      </Button>
+                    )}
                     {b.zoomJoinUrl ? (
                       <Button size="sm" variant="secondary" asChild>
                         <a href={b.zoomJoinUrl} target="_blank" rel="noreferrer">
@@ -134,7 +156,7 @@ function SchedulerPage() {
                     <Badge variant="outline">{l.source === "calendly" ? "Calendly" : l.source === "tidycal" ? "TidyCal" : l.source === "acuity" ? "Acuity" : "Northline"}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {l.memberName} · {l.durationMin} min · {l.bookings} bookings · Zoom
+                    {l.memberName} · {l.durationMin} min · {l.bookings} bookings · {l.locationKind === "meet" ? "Meet" : "Zoom"}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" onClick={() => setLinkId(l.id)}>
@@ -160,7 +182,7 @@ function SchedulerPage() {
 
           <TabsContent value="connections" className="mt-4 space-y-6">
             <p className="text-sm text-muted-foreground">
-              Each AE connects Calendly, TidyCal, Acuity, or Zoom. Bookings inherit the host's Zoom room and send confirmation mail from their address.
+              Each AE connects Calendly, TidyCal, Acuity, Zoom, or Google Meet. Bookings inherit the host's room and send confirmation mail from their address.
             </p>
             <ConnectForm members={members} defaultMemberId={memberId} onSaved={refresh} />
             <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
@@ -177,7 +199,7 @@ function SchedulerPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {c.provider !== "zoom" && c.connected && (
+                    {c.provider !== "zoom" && c.provider !== "meet" && c.connected && (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -195,13 +217,23 @@ function SchedulerPage() {
                         Sync
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => toggleConnection({ data: { id: c.id, autoZoom: !c.autoZoom } }).then(refresh)}
-                    >
-                      {c.autoZoom ? "Zoom on" : "Zoom off"}
-                    </Button>
+                    {c.provider === "meet" ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleConnection({ data: { id: c.id, autoMeet: !c.autoMeet } }).then(refresh)}
+                      >
+                        {c.autoMeet ? "Meet on" : "Meet off"}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleConnection({ data: { id: c.id, autoZoom: !c.autoZoom } }).then(refresh)}
+                      >
+                        {c.autoZoom ? "Zoom on" : "Zoom off"}
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -277,7 +309,7 @@ function BookForm({ linkId, onCancel, onSaved }: { linkId: number; onCancel: () 
             notes: String(fd.get("notes") || "") || undefined,
           },
         }).then((r) => {
-          toast.success(r.zoomJoinUrl ? "Booked · Zoom + confirmation sent" : "Booked · confirmation sent");
+          toast.success(r.meetJoinUrl ? "Booked · Meet + confirmation sent" : r.zoomJoinUrl ? "Booked · Zoom + confirmation sent" : "Booked · confirmation sent");
           onSaved();
         });
       }}
@@ -310,7 +342,9 @@ function ConnectForm({
   const placeholder =
     provider === "zoom"
       ? "you@northline.av"
-      : provider === "tidycal"
+      : provider === "meet"
+        ? "you@hurricaneproductionsllc.com"
+        : provider === "tidycal"
         ? "tidycal.com/you"
         : provider === "acuity"
           ? "you.acuityscheduling.com"
@@ -350,6 +384,7 @@ function ConnectForm({
         <option value="tidycal">TidyCal</option>
         <option value="acuity">Acuity</option>
         <option value="zoom">Zoom</option>
+        <option value="meet">Google Meet</option>
       </select>
       <Input name="handle" placeholder={placeholder} required />
       <Button type="submit" size="sm">

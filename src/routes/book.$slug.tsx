@@ -16,6 +16,7 @@ function PublicBook() {
   const [done, setDone] = useState<{
     zoomJoinUrl?: string | null;
     zoomPasscode?: string | null;
+    meetJoinUrl?: string | null;
     hostName?: string;
     startsAt?: string;
     confirmationSent?: boolean;
@@ -58,7 +59,7 @@ function PublicBook() {
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">{l.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {l.memberName} · {l.durationMin} minutes. A Zoom link and confirmation land in your inbox.
+            {l.memberName} · {l.durationMin} minutes. A Google Meet link and confirmation land in your inbox.
           </p>
           <div className="space-y-1">
             <Label htmlFor="guestName">Your name</Label>
@@ -92,10 +93,18 @@ function PublicBook() {
           <h1 className="text-2xl font-semibold">You are on the calendar.</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {done.confirmationSent
-              ? "A confirmation is in your inbox, including the Zoom join link."
+              ? "A confirmation is in your inbox, including the join link."
               : "Your host will send the call details."}{" "}
             If load-in is this week, call the Gowanus shop.
           </p>
+          {done.meetJoinUrl && (
+            <p className="mt-4 text-sm">
+              Google Meet:{" "}
+              <a className="underline-offset-4 hover:underline" href={done.meetJoinUrl} target="_blank" rel="noreferrer">
+                Join meeting
+              </a>
+            </p>
+          )}
           {done.zoomJoinUrl && (
             <p className="mt-4 text-sm">
               Zoom:{" "}
