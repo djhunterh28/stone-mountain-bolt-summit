@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/f/site-survey",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 350,
+      "bodyTextHash": "dfa1e2307f98d66b75ea3c09d1a56f4a1693fadf735118b0f2902760be4af0f7",
+      "bodyTextPrefix": "Northline Site survey request Hold a walk at the venue. New Busi",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/form-public-smoke.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 350,
+      "bodyTextHash": "dfa1e2307f98d66b75ea3c09d1a56f4a1693fadf735118b0f2902760be4af0f7",
+      "bodyTextPrefix": "Northline Site survey request Hold a walk at the venue. New Busi",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/form-public-smoke-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/form-public-smoke.json"
+}

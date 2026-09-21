@@ -1,0 +1,1 @@
+var e={reports:500,fields:500,automations:500,teamInboxes:10,enrichmentCredits:500};export{e as t};
