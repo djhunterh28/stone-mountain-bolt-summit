@@ -61,7 +61,6 @@ const PAGES = [
   { label: "Cold lists", to: "/cold" },
   { label: "Unique views", to: "/views" },
   { label: "Guest lists", to: "/guests" },
-  { label: "Floor plan designer", to: "/floorplans" },
   { label: "Reviews & reputation", to: "/reviews" },
   { label: "Event hand-off", to: "/handoff" },
   { label: "Directory", to: "/discover" },

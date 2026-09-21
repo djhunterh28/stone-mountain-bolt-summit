@@ -40,6 +40,7 @@ export type FloorMark = {
 
 export type FloorPlan = {
   id: number;
+  dealId: number | null;
   name: string;
   venue: string | null;
   notes: string | null;
@@ -85,6 +86,7 @@ function mapPlan(p: Record<string, unknown>): FloorPlan {
   const layout = parseJson<FloorLayout>(p.layout, EMPTY_LAYOUT);
   return {
     id: Number(p.id),
+    dealId: p.deal_id == null ? null : Number(p.deal_id),
     name: String(p.name),
     venue: p.venue == null ? null : String(p.venue),
     notes: p.notes == null ? null : String(p.notes),
@@ -105,9 +107,18 @@ function mapPlan(p: Record<string, unknown>): FloorPlan {
 
 export const getFloorPlans = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async () => {
+  .validator((input: { dealId?: number } = {}) => input)
+  .handler(async ({ data }) => {
     const sql = await getSql();
-    const rows = await sql`select * from floor_plans where archived is not true order by template desc, id`;
+    const rows = data.dealId
+      ? await sql.query(
+          `select * from floor_plans
+           where archived is not true
+             and (deal_id = $1 or (template is true and deal_id is null))
+           order by template desc, id`,
+          [data.dealId],
+        )
+      : await sql.query(`select * from floor_plans where archived is not true order by template desc, id`);
     return rows.map(mapPlan);
   });
 
@@ -145,29 +156,38 @@ export const saveFloorPlan = createServerFn({ method: "POST" })
 
 export const createFloorPlan = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { name: string; venue?: string }) => input)
+  .validator((input: { name: string; venue?: string; dealId?: number; template?: boolean }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
+    const isTemplate = data.template === true && data.dealId == null;
     const rows = await sql.query(
-      `insert into floor_plans (name, venue, template, layout, marks, notes)
-       values ($1, $2, true, $3, '[]', null) returning *`,
-      [data.name.trim() || "New venue", data.venue?.trim() || null, JSON.stringify(EMPTY_LAYOUT)],
+      `insert into floor_plans (name, venue, template, deal_id, layout, marks, notes)
+       values ($1, $2, $3, $4, $5, '[]', null) returning *`,
+      [
+        data.name.trim() || (isTemplate ? "New venue" : "Show plot"),
+        data.venue?.trim() || null,
+        isTemplate,
+        data.dealId ?? null,
+        JSON.stringify(EMPTY_LAYOUT),
+      ],
     );
     return mapPlan(rows[0]);
   });
 
 export const duplicateFloorPlan = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { id: number; name?: string }) => input)
+  .validator((input: { id: number; dealId: number; name?: string }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
     const cur = (await sql.query(`select * from floor_plans where id = $1`, [data.id]))[0];
     if (!cur) return { ok: false as const };
-    const name = data.name?.trim() || `Show plot — ${String(cur.name)}`;
+    const deal = (await sql.query(`select id, title, venue from deals where id = $1`, [data.dealId]))[0];
+    if (!deal) return { ok: false as const };
+    const name = data.name?.trim() || `${String(deal.title)} — ${String(cur.name)}`;
     const rows = await sql.query(
-      `insert into floor_plans (name, venue, template, notes, layout, marks)
-       values ($1, $2, false, $3, $4, $5) returning *`,
-      [name, cur.venue, cur.notes, cur.layout, cur.marks],
+      `insert into floor_plans (name, venue, template, deal_id, notes, layout, marks)
+       values ($1, $2, false, $3, $4, $5, $6) returning *`,
+      [name, deal.venue ?? cur.venue, data.dealId, cur.notes, cur.layout, cur.marks],
     );
     return { ok: true as const, plan: mapPlan(rows[0]) };
   });

@@ -39,6 +39,7 @@ import {
 } from "@/lib/crm/server";
 import { addEventNote, draftFromDeal, listEventNotes, pinNote, updateEventNote } from "@/lib/crm/ops";
 import { NoteHtml, NOTE_CATEGORIES, notePlain, RichTextEditor, sanitizeNoteHtml } from "@/components/crm/rich-text";
+import { FloorPlanDesk } from "@/components/crm/floor-plan-desk";
 import { cloneDeal } from "@/lib/crm/ultimate";
 import { convertDealToProject, createEnvelope, createProposal } from "@/lib/portal/server";
 import { runAi } from "@/lib/crm/ai";
@@ -110,7 +111,7 @@ function DealBody({
   const [qty, setQty] = useState("1");
   const [loseOpen, setLoseOpen] = useState<"lost" | "cancelled" | null>(null);
   const [lostReason, setLostReason] = useState("Budget");
-  const [pane, setPane] = useState<"activity" | "notes" | "email" | "files" | "invoice">("activity");
+  const [pane, setPane] = useState<"activity" | "notes" | "email" | "files" | "invoice" | "floor">("activity");
   const [hist, setHist] = useState<"all" | "activity" | "note" | "email" | "file" | "invoice" | "log">("all");
   const [more, setMore] = useState(false);
   const [actSubject, setActSubject] = useState("");
@@ -583,6 +584,7 @@ function DealBody({
                   ["email", "Email"],
                   ["files", "Files"],
                   ["invoice", "Invoice"],
+                  ["floor", "Floor plan"],
                 ] as const
               ).map(([id, label]) => (
                 <Button key={id} size="sm" variant={pane === id ? "secondary" : "ghost"} onClick={() => setPane(id)}>
@@ -590,6 +592,7 @@ function DealBody({
                   {id === "notes" && <FileText className="size-3.5" />}
                   {id === "email" && <Mail className="size-3.5" />}
                   {id === "files" && <Paperclip className="size-3.5" />}
+                  {id === "floor" && <MapPin className="size-3.5" />}
                   {label}
                 </Button>
               ))}
@@ -724,6 +727,11 @@ function DealBody({
             )}
           </div>
 
+          {pane === "floor" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <FloorPlanDesk dealId={d.id} venue={d.venue} title={d.title} />
+            </div>
+          ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             <section className="mb-6">
               <button type="button" className="flex w-full items-center justify-between text-sm font-medium" onClick={() => setFocusOpen((v) => !v)}>

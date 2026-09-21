@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { checkEmailGate, issueOtp, verifyOtp } from "@/lib/portal/server";
 import { getPortalBrand } from "@/lib/portal/brand";
 import { HurricaneLogo } from "@/components/portal/hp-mark";
+import { DEMO_EMAIL, DEMO_PASSWORD, ensureDemoAccount } from "@/lib/crm/demo-account";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -19,6 +20,7 @@ function Login() {
     (new URLSearchParams(window.location.search).get("portal") === "1" ||
       window.location.hostname.startsWith("portal."));
   const brand = useQuery({ queryKey: ["portal-brand"], queryFn: () => getPortalBrand(), enabled: portalMode });
+  const demo = useQuery({ queryKey: ["demo-account"], queryFn: () => ensureDemoAccount(), enabled: authEnabled });
   const b = brand.data;
   const [mode, setMode] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
@@ -230,6 +232,31 @@ function Login() {
                         : "Send verification code"}
                 </Button>
               </form>
+
+              {mode === "in" && (
+                <div className="mt-4 rounded-xl bg-muted px-3 py-3 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">Demo / testing</p>
+                  <p className="mt-1 font-mono text-[12px] text-foreground">
+                    {DEMO_EMAIL}
+                    <br />
+                    {DEMO_PASSWORD}
+                  </p>
+                  <p className="mt-1">{demo.isSuccess ? "Account is ready on this workspace." : "Provisioning demo seat…"}</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="mt-2"
+                    disabled={busy !== "idle"}
+                    onClick={() => {
+                      setEmail(DEMO_EMAIL);
+                      setPassword(DEMO_PASSWORD);
+                    }}
+                  >
+                    Fill demo login
+                  </Button>
+                </div>
+              )}
 
               <p className="mt-6 text-sm text-muted-foreground">
                 {mode === "in" ? "New to the shop?" : "Already registered?"}{" "}
