@@ -12,16 +12,21 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MemberAvatar } from "@/components/crm/avatar";
 import { createField, getBootstrap, listFields, listScores, updateStage } from "@/lib/crm/server";
-import { createApiToken, getAdmin, revokeToken } from "@/lib/crm/ultimate";
+import { getAdmin } from "@/lib/crm/ultimate";
 import { createTeamInbox, getUsage } from "@/lib/crm/governance";
 import { ULTIMATE_LIMITS } from "@/lib/crm/limits";
 import { getBranding, saveBranding, syncPipedrive } from "@/lib/portal/server";
-import { getAiDesk, saveAiProfile } from "@/lib/crm/ops";
 import { ImportPanel } from "@/components/crm/import-panel";
 import { SandboxPanel } from "@/components/crm/sandbox-panel";
 import { AdminPanel } from "@/components/crm/admin-panel";
 import { SecurityPanel } from "@/components/crm/security-panel";
 import { MarketplacePanel } from "@/components/crm/marketplace-panel";
+import { SendingDomainPanel } from "@/components/crm/domain-panel";
+import { AutomationsPanel } from "@/components/crm/automations-panel";
+import { SequencesPanel } from "@/components/crm/sequences-panel";
+import { PortalDomainDesk } from "@/components/crm/portal-domain-panel";
+import { DevelopersPanel } from "@/components/crm/developers-panel";
+import { IntegrationsDesk } from "@/components/crm/integrations-desk";
 import { STAFF_NAV, catalogFor } from "@/components/layout/sidebar-nav";
 import { getNavPrefs, insertBefore, mergeNavLayout, saveNavPrefs } from "@/lib/crm/prefs";
 import { useUi } from "@/lib/crm/store";
@@ -43,7 +48,7 @@ function AppearancePanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        White is a clean canvas with graphite ink. Nightline is the original steel desk. System follows the device.
+        White is a clean canvas with Hurricane blue and copper. Nightline is a cinematic field with brand lighting. System follows the device.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {THEME_OPTIONS.map((opt) => {
@@ -121,14 +126,11 @@ function IntegrationsPanel() {
       <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
         <h3 className="text-sm font-medium">Calendly, TidyCal, Acuity, Zoom & Google Meet</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Per-user scheduling plus Deezer and Google Places live on Integrations.
+          Per-user scheduling plus Deezer and Google Places are on this tab. Scheduler still holds the booking links.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button asChild size="sm" variant="secondary">
             <Link to="/scheduler">Scheduler</Link>
-          </Button>
-          <Button asChild size="sm" variant="secondary">
-            <Link to="/integrations">All integrations</Link>
           </Button>
         </div>
       </article>
@@ -161,7 +163,7 @@ function SettingsPage() {
 
   return (
     <div className="pb-12">
-      <PageHeader title="Settings" subtitle="Appearance, sidebar, pipelines, import, sandbox, admin, security, marketplace, fields, capacity, connectors, and team inboxes." />
+      <PageHeader title="Settings" subtitle="Appearance, sidebar, sending domain, import, sandbox, admin, security, marketplace, fields, capacity, connectors, and team inboxes." />
       <div className="px-4 sm:px-6">
         <Tabs
           value={tab ?? "appearance"}
@@ -181,11 +183,14 @@ function SettingsPage() {
             <TabsTrigger value="routing">Lead routing</TabsTrigger>
             <TabsTrigger value="mailboxes">Mailboxes</TabsTrigger>
             <TabsTrigger value="capacity">Capacity</TabsTrigger>
-            <TabsTrigger value="api">API</TabsTrigger>
+            <TabsTrigger value="api">Developers</TabsTrigger>
             <TabsTrigger value="scores">Scores</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
-            <TabsTrigger value="portal">White-label</TabsTrigger>
+            <TabsTrigger value="domain">Sending domain</TabsTrigger>
+            <TabsTrigger value="automations">Automations</TabsTrigger>
+            <TabsTrigger value="sequences">Sequences</TabsTrigger>
+            <TabsTrigger value="portal">Portal domain</TabsTrigger>
           </TabsList>
           <TabsContent value="appearance" className="mt-4">
             <AppearancePanel />
@@ -357,7 +362,7 @@ function SettingsPage() {
           <TabsContent value="mailboxes" className="mt-4">
             <p className="mb-3 text-sm text-muted-foreground">
               5 synced accounts per user, plus {ULTIMATE_LIMITS.teamInboxes} shared team inboxes. Outbound still leaves from the{" "}
-              <Link to="/domain" className="underline underline-offset-2">
+              <Link to="/settings" search={{ tab: "domain" }} className="underline underline-offset-2">
                 authenticated sending domain
               </Link>
               .
@@ -413,50 +418,8 @@ function SettingsPage() {
               {usage.data ? `${usage.data.enrichmentRemaining} enrichment lookups remaining this cycle.` : "Loading usage…"}
             </p>
           </TabsContent>
-          <TabsContent value="api" className="mt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Token-based REST. Ultimate rate limit is 210,000 × seats. Full catalog, Try-it, and webhook payloads live on Developers.
-            </p>
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/developers">Open developer console</Link>
-            </Button>
-            <form
-              className="flex flex-wrap gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                void createApiToken({
-                  data: { name: String(fd.get("name") || "Token"), scopes: String(fd.get("scopes") || "events:read,clients:read") },
-                }).then((r) => {
-                  toast.success(`Token ${r.token} — copy it now`);
-                  qc.invalidateQueries({ queryKey: ["admin"] });
-                  qc.invalidateQueries({ queryKey: ["developer"] });
-                });
-              }}
-            >
-              <Input name="name" placeholder="Token name" className="w-40" />
-              <Input name="scopes" placeholder="events:read,clients:read" className="w-56" />
-              <Button type="submit" size="sm">
-                Mint key
-              </Button>
-            </form>
-            <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
-              {(admin.data?.tokens ?? []).map((t) => (
-                <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <span>
-                    {t.name}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {t.scopes} · {t.revoked ? "revoked" : t.tokenHint}
-                    </span>
-                  </span>
-                  {!t.revoked && (
-                    <Button size="sm" variant="ghost" onClick={() => revokeToken({ data: { id: t.id } }).then(() => qc.invalidateQueries({ queryKey: ["admin"] }))}>
-                      Revoke
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
+          <TabsContent value="api" className="mt-4">
+            <DevelopersPanel />
           </TabsContent>
           <TabsContent value="scores" className="mt-4">
             <p className="mb-3 text-sm text-muted-foreground">Custom scoring models — 10 on Ultimate.</p>
@@ -476,14 +439,24 @@ function SettingsPage() {
               </article>
             ))}
           </TabsContent>
-          <TabsContent value="integrations" className="mt-4 max-w-lg">
+          <TabsContent value="integrations" className="mt-4 space-y-6">
             <IntegrationsPanel />
+            <IntegrationsDesk />
           </TabsContent>
           <TabsContent value="marketplace" className="mt-4">
             <MarketplacePanel />
           </TabsContent>
-          <TabsContent value="portal" className="mt-4 max-w-lg">
-            <PortalDomainPanel />
+          <TabsContent value="domain" className="mt-4">
+            <SendingDomainPanel />
+          </TabsContent>
+          <TabsContent value="automations" className="mt-4">
+            <AutomationsPanel />
+          </TabsContent>
+          <TabsContent value="sequences" className="mt-4">
+            <SequencesPanel />
+          </TabsContent>
+          <TabsContent value="portal" className="mt-4">
+            <PortalDomainDesk />
           </TabsContent>
         </Tabs>
       </div>
@@ -568,24 +541,6 @@ function SidebarPrefsPanel() {
         })}
       </ul>
     </div>
-  );
-}
-
-function PortalDomainPanel() {
-  const desk = useQuery({ queryKey: ["ai-desk"], queryFn: () => getAiDesk() });
-  const p = desk.data?.profile;
-  if (!p) return <p className="text-sm text-muted-foreground">Loading portal domain…</p>;
-  return (
-    <article className="space-y-3 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
-      <h3 className="text-sm font-medium">White-label portal domain</h3>
-      <p className="text-sm text-muted-foreground">
-        Clients hit your domain. Logo and colors follow the company profile. They never see a third-party address.
-      </p>
-      <Button asChild size="sm" variant="secondary">
-        <Link to="/portal-domain">Open portal domain desk</Link>
-      </Button>
-      <p className="text-xs text-muted-foreground">Live as https://{p.portalDomain} · brand #{p.brandColor}</p>
-    </article>
   );
 }
 

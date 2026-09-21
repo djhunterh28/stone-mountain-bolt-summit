@@ -37,7 +37,6 @@ function BroadcastsPage() {
           <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="mail">Client mail</TabsTrigger>
             <TabsTrigger value="sms">SMS / QUO</TabsTrigger>
-            <TabsTrigger value="cold">Cold lists</TabsTrigger>
             <TabsTrigger value="domain">Domain & signatures</TabsTrigger>
           </TabsList>
           <TabsContent value="mail" className="mt-4">
@@ -49,23 +48,6 @@ function BroadcastsPage() {
             </p>
             <Button asChild size="sm" variant="secondary">
               <Link to="/sms">Open SMS desk</Link>
-            </Button>
-          </TabsContent>
-          <TabsContent value="cold" className="mt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Expo scans and bought lists never enter pipeline metrics. Import, tag campaigns, and reply-to-lead live on the
-              cold desk.
-            </p>
-            <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
-              {(desk.data?.lists ?? []).map((l) => (
-                <li key={l.id} className="flex justify-between px-4 py-2.5 text-sm">
-                  <span>{l.name}</span>
-                  <span className="text-xs text-muted-foreground">{l.n} names</span>
-                </li>
-              ))}
-            </ul>
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/cold">Open cold lists</Link>
             </Button>
           </TabsContent>
           <TabsContent value="domain" className="mt-4 space-y-3">
@@ -85,7 +67,7 @@ function BroadcastsPage() {
               </article>
             ))}
             <Button asChild size="sm" variant="secondary">
-              <Link to="/domain">Open sending domain</Link>
+              <Link to="/settings" search={{ tab: "domain" }}>Open sending domain</Link>
             </Button>
             {(desk.data?.signatures ?? []).map((s) => (
               <pre key={s.id} className="rounded-xl bg-card p-4 font-mono text-xs shadow-[var(--shadow-border)]">

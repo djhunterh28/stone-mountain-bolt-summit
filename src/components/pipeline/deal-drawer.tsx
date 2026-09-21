@@ -822,9 +822,10 @@ function DealBody({
               )}
             </section>
           </div>
+          )}
+        </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

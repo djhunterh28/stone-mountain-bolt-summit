@@ -12,6 +12,7 @@ const badgeVariants = cva(
         warn: "bg-warn/15 text-warn",
         danger: "bg-destructive/15 text-destructive",
         steel: "bg-primary/12 text-primary",
+        copper: "bg-copper/15 text-copper",
       },
     },
     defaultVariants: { variant: "default" },

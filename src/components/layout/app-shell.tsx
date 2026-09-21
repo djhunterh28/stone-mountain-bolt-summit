@@ -56,7 +56,6 @@ function isPublic(pathname: string) {
     pathname === "/portal" ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/rsvp/") ||
-    pathname.startsWith("/discover") ||
     pathname.startsWith("/cal/") ||
     pathname === "/login" ||
     pathname === "/forgot" ||
@@ -155,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh bg-background">
-      <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border bg-sidebar lg:flex">
+      <aside className="nl-rail sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border lg:flex">
         <Brand client={client} company={portalBrand.data?.company} primary={portalBrand.data?.primaryHex} />
         <SidebarNav pathname={pathname} client={client} compact />
       </aside>
@@ -163,7 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button className="absolute inset-0 bg-overlay/60" onClick={() => setSidebarOpen(false)} aria-label="Close menu" />
-          <aside className="relative z-10 flex h-full w-72 flex-col bg-sidebar shadow-[var(--shadow-lift)]">
+          <aside className="nl-rail relative z-10 flex h-full w-72 flex-col shadow-[var(--shadow-lift)]">
             <div className="flex items-center justify-between px-3 py-3">
               <Brand client={client} company={portalBrand.data?.company} primary={portalBrand.data?.primaryHex} />
               <Button size="icon-sm" variant="ghost" onClick={() => setSidebarOpen(false)}>
@@ -176,7 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-sm sm:px-4">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md sm:px-4">
           <Button size="icon-sm" variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="size-4" />
           </Button>
@@ -189,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="truncate">Find a show, person, or command</span>
             <kbd className="ml-auto hidden font-mono text-[10px] sm:inline">⌘K</kbd>
           </button>
-          <Button size="sm" onClick={() => setAddOpen(true, "deal")}>
+          <Button size="sm" variant="copper" onClick={() => setAddOpen(true, "deal")}>
             <Plus className="size-3.5" />
             New
           </Button>

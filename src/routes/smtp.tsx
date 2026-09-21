@@ -103,7 +103,7 @@ function SmtpPage() {
               Run due workflows
             </Button>
             <Button asChild size="sm" variant="ghost">
-              <Link to="/domain">Sending domain</Link>
+              <Link to="/settings" search={{ tab: "domain" }}>Sending domain</Link>
             </Button>
           </div>
         </article>

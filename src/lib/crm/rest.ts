@@ -149,7 +149,7 @@ export async function handleRest(request: Request): Promise<Response> {
       name: "Northline API",
       version: "1.0",
       auth: "Bearer nl_live_… or X-Api-Key",
-      docs: "/developers",
+      docs: "/settings?tab=api",
       openapi: "/api/v1/openapi.json",
       endpoints: REST_ENDPOINTS,
     });

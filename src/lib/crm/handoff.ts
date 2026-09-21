@@ -159,15 +159,23 @@ async function packDeal(sql: Sql, dealId: number): Promise<{ pack: HandoffPack; 
     [dealId],
   );
   const guests = await sql.query(`select name, party, rsvp, meal from guests where deal_id = $1 order by id`, [dealId]);
-  const floorRow = d.venue
-    ? (
-        await sql.query(
-          `select name, venue, notes, marks from floor_plans
-            where venue = $1 and coalesce(archived, false) is not true order by id limit 1`,
-          [String(d.venue)],
-        )
-      )[0]
-    : undefined;
+  const floorRow = (
+    await sql.query(
+      `select name, venue, notes, marks from floor_plans
+        where deal_id = $1 and coalesce(archived, false) is not true
+        order by id desc limit 1`,
+      [dealId],
+    )
+  )[0] ??
+    (d.venue
+      ? (
+          await sql.query(
+            `select name, venue, notes, marks from floor_plans
+              where venue = $1 and coalesce(archived, false) is not true order by id limit 1`,
+            [String(d.venue)],
+          )
+        )[0]
+      : undefined);
   const inv = (
     await sql.query(`select count(*) as n, coalesce(sum(amount), 0) as total from invoices where deal_id = $1`, [dealId])
   )[0];

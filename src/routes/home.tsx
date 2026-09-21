@@ -75,7 +75,6 @@ function HomePage() {
 
       <div className="mt-6 flex flex-wrap gap-2 px-4 sm:px-6">
         <Button asChild size="sm"><Link to="/">New deal</Link></Button>
-        <Button asChild size="sm" variant="secondary"><Link to="/quotes">Quote wizard</Link></Button>
         <Button asChild size="sm" variant="secondary"><Link to="/ai">AI draft</Link></Button>
         <Button asChild size="sm" variant="secondary"><Link to="/finance">Invoice</Link></Button>
         <Button asChild size="sm" variant="ghost"><Link to="/guests">Guests</Link></Button>

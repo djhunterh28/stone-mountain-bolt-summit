@@ -4,13 +4,13 @@ export type ThemePreference = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
 export const THEME_COLORS = {
-  light: "#ffffff",
-  dark: "#0b0c0e",
+  light: "#0d47a1",
+  dark: "#070b14",
 } as const;
 
 export const THEME_SWATCHES = {
-  light: { rail: "#ffffff", surface: "#ffffff", ink: "#2a3038" },
-  dark: { rail: "#0e0f12", surface: "#141518", ink: "#c5ccd6" },
+  light: { rail: "#0d47a1", surface: "#ffffff", ink: "#e85d04" },
+  dark: { rail: "#0a1220", surface: "#101827", ink: "#4d8ae8" },
 } as const;
 
 export const THEME_OPTIONS: {
@@ -18,8 +18,8 @@ export const THEME_OPTIONS: {
   label: string;
   hint: string;
 }[] = [
-  { id: "light", label: "White", hint: "White canvas, graphite ink" },
-  { id: "dark", label: "Nightline", hint: "Steel on charcoal" },
+  { id: "light", label: "White", hint: "White canvas, Hurricane blue, copper" },
+  { id: "dark", label: "Nightline", hint: "Cinematic field, brand lighting" },
   { id: "system", label: "System", hint: "Follow the device" },
 ];
 

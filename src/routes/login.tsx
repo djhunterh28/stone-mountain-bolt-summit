@@ -92,7 +92,7 @@ function Login() {
 
   return (
     <main className="grid min-h-dvh bg-background lg:grid-cols-[1.05fr_0.95fr]">
-      <aside className="relative hidden overflow-hidden border-r border-border bg-sidebar px-12 py-12 lg:flex lg:flex-col">
+      <aside className="nl-brand-panel relative hidden overflow-hidden px-12 py-12 lg:flex lg:flex-col">
         <div className="flex items-center gap-2.5">
           {portalMode ? (
             <>
