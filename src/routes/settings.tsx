@@ -570,6 +570,8 @@ function SidebarPrefsPanel() {
     </div>
   );
 }
+
+function PortalDomainPanel() {
   const desk = useQuery({ queryKey: ["ai-desk"], queryFn: () => getAiDesk() });
   const p = desk.data?.profile;
   if (!p) return <p className="text-sm text-muted-foreground">Loading portal domain…</p>;

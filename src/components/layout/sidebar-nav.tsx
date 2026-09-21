@@ -195,7 +195,7 @@ export function SidebarNav({
       return;
     }
     if (zone === "pin") {
-      persist({ pins: insertBefore(merged.pins.includes(dragging) ? merged.pins : [...merged.pins, dragging], dragging, targetHref), order: merged.order });
+      persist({ pins: insertBefore(merged.pins, dragging, targetHref), order: merged.order });
     } else {
       persist({
         pins: merged.pins.filter((h) => h !== dragging),

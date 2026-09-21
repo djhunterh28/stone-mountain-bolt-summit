@@ -38,6 +38,7 @@ const PAGES = [
   { label: "Developers", to: "/developers" },
   { label: "Integrations", to: "/integrations" },
   { label: "Settings", to: "/settings" },
+  { label: "Sidebar layout", to: "/settings?tab=sidebar" },
   { label: "Security", to: "/settings?tab=security" },
   { label: "Files", to: "/files" },
   { label: "Approvals", to: "/approvals" },
