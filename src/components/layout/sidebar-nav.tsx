@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,7 +26,7 @@ import {
   LayoutGrid,
   Mail,
   MailCheck,
-  Map,
+  Map as MapIcon,
   Megaphone,
   MessageSquare,
   Monitor,
@@ -89,7 +89,7 @@ export const STAFF_MORE: NavItem[] = [
   { href: "/crew", label: "Crew", icon: Users },
   { href: "/views", label: "Unique views", icon: CalendarRange },
   { href: "/guests", label: "Guests", icon: UserCheck },
-  { href: "/floorplans", label: "Floor plans", icon: Map },
+  { href: "/floorplans", label: "Floor plans", icon: MapIcon },
   { href: "/reviews", label: "Reviews", icon: Star },
   { href: "/gigs", label: "Gigs", icon: Briefcase },
   { href: "/handoff", label: "Hand-off", icon: Handshake },
@@ -167,19 +167,23 @@ export function SidebarNav({
   });
   const catalog = catalogFor(client);
   const { merged, pinned, rest } = applyLayout(catalog, prefs.data ?? { pins: [], order: [] });
+  const layoutRef = useRef(merged);
+  layoutRef.current = merged;
 
   function persist(next: NavLayout) {
     const applied = mergeNavLayout(
       catalog.map((i) => i.href),
       next,
     );
+    layoutRef.current = applied;
     qc.setQueryData(["nav-prefs", memberId], applied);
     void saveNavPrefs({ data: { memberId, ...applied } });
   }
 
   function togglePin(href: string) {
-    const pins = merged.pins.includes(href) ? merged.pins.filter((h) => h !== href) : [...merged.pins, href];
-    persist({ pins, order: merged.order });
+    const cur = layoutRef.current;
+    const pins = cur.pins.includes(href) ? cur.pins.filter((h) => h !== href) : [...cur.pins, href];
+    persist({ pins, order: cur.order });
   }
 
   function onDragStart(href: string, e: DragEvent) {
@@ -194,12 +198,13 @@ export function SidebarNav({
       setOver(null);
       return;
     }
+    const cur = layoutRef.current;
     if (zone === "pin") {
-      persist({ pins: insertBefore(merged.pins, dragging, targetHref), order: merged.order });
+      persist({ pins: insertBefore(cur.pins, dragging, targetHref), order: cur.order });
     } else {
       persist({
-        pins: merged.pins.filter((h) => h !== dragging),
-        order: insertBefore(merged.order, dragging, targetHref),
+        pins: cur.pins.filter((h) => h !== dragging),
+        order: insertBefore(cur.order, dragging, targetHref),
       });
     }
     setDragging(null);
@@ -262,23 +267,25 @@ export function SidebarNav({
           />
         ))}
       </div>
-      {!client && (
-        <div className="border-t border-border px-2 py-2">
-          <Button
-            size="sm"
-            variant={arrange ? "secondary" : "ghost"}
-            className="w-full justify-start text-xs"
-            onClick={() => setArrange((v) => !v)}
+      <div className="border-t border-border px-2 py-2">
+        <Button
+          size="sm"
+          variant={arrange ? "secondary" : "ghost"}
+          className="w-full justify-start text-xs"
+          onClick={() => setArrange((v) => !v)}
+        >
+          {arrange ? "Done arranging" : "Arrange sidebar"}
+        </Button>
+        {arrange && (
+          <button
+            type="button"
+            className="mt-1 w-full px-2.5 text-left text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={reset}
           >
-            {arrange ? "Done arranging" : "Arrange sidebar"}
-          </Button>
-          {arrange && (
-            <button type="button" className="mt-1 w-full px-2.5 text-left text-[11px] text-muted-foreground hover:text-foreground" onClick={reset}>
-              Reset to default order
-            </button>
-          )}
-        </div>
-      )}
+            Reset to default order
+          </button>
+        )}
+      </div>
     </nav>
   );
 }
@@ -336,16 +343,18 @@ function NavRow({
           onDragEnd={() => undefined}
           className={cn(
             "shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing",
-            compact ? "hidden xl:inline" : "inline",
             arrange ? "opacity-100" : "opacity-0 group-hover:opacity-100",
           )}
           aria-label={`Reorder ${item.label}`}
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
         >
           <GripVertical className="size-3.5" />
         </span>
         <Icon className="size-4 shrink-0" />
-        <span className={cn("min-w-0 flex-1 truncate", compact && "lg:hidden xl:inline")}>{item.label}</span>
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
         <button
           type="button"
           aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
@@ -355,8 +364,7 @@ function NavRow({
             onStar();
           }}
           className={cn(
-            "size-6 shrink-0 items-center justify-center rounded-sm",
-            compact ? "hidden xl:flex" : "flex",
+            "flex size-6 shrink-0 items-center justify-center rounded-sm",
             pinned ? "text-primary opacity-100" : "text-muted-foreground opacity-0 group-hover:opacity-100",
             arrange && "opacity-100",
           )}
