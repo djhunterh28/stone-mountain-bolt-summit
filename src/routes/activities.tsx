@@ -9,17 +9,16 @@ import {
   startOfWeek,
   addMonths,
   subMonths,
-  startOfYear,
-  setMonth,
-  getDay,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { listActivities, listDeals, toggleActivity } from "@/lib/crm/server";
+import { listActivities, toggleActivity } from "@/lib/crm/server";
 import { listCalendarAccounts, syncCalendars, toggleCalendar } from "@/lib/crm/governance";
+import { getUniqueViews } from "@/lib/crm/views";
+import { OpsDayGantt, WeekendYear } from "@/components/crm/unique-views";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -40,9 +39,9 @@ function ActivitiesPage() {
     queryFn: () => listActivities({ data: { ownerId: mine ? memberId : undefined } }),
   });
   const cals = useQuery({ queryKey: ["calendars"], queryFn: () => listCalendarAccounts() });
-  const deals = useQuery({
-    queryKey: ["deals", 1, "all"],
-    queryFn: () => listDeals({ data: { pipelineId: 1, status: "all" } }),
+  const desk = useQuery({
+    queryKey: ["unique-views"],
+    queryFn: () => getUniqueViews(),
     enabled: view === "year" || view === "gantt",
   });
   const list = acts.data ?? [];
@@ -156,15 +155,23 @@ function ActivitiesPage() {
         <div className="px-4 pb-10 sm:px-6">
           <p className="mb-3 text-sm text-muted-foreground">
             Weekend-aligned year. Multi-event days fill darker.{" "}
-            <Link to="/crew" className="underline-offset-4 hover:underline">
-              Staff Gantt lives with crew
+            <Link to="/views" className="underline-offset-4 hover:underline">
+              Unique views desk
             </Link>
             .
           </p>
-          <YearScan deals={(deals.data ?? []).filter((d) => d.eventDate)} />
+          <WeekendYear shows={desk.data?.shows ?? []} year={new Date().getFullYear()} />
         </div>
       )}
-      {view === "gantt" && <DayGantt deals={deals.data ?? []} activities={list} />}
+      {view === "gantt" && (
+        <div className="px-4 pb-10 sm:px-6">
+          <OpsDayGantt
+            shows={desk.data?.shows ?? []}
+            shifts={desk.data?.shifts ?? []}
+            activities={list}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -261,86 +268,6 @@ function WeekGrid({
           </article>
         );
       })}
-    </div>
-  );
-}
-
-function YearScan({ deals }: { deals: { id: number; title: string; eventDate: string | null }[] }) {
-  const year = 2026;
-  const months = useMemo(() => {
-    return Array.from({ length: 12 }, (_, m) => {
-      const first = setMonth(startOfYear(new Date(year, 0, 1)), m);
-      const pad = getDay(first);
-      const days: (Date | null)[] = Array.from({ length: pad }, () => null);
-      let d = first;
-      while (d.getMonth() === m) {
-        days.push(d);
-        d = addDays(d, 1);
-      }
-      return { name: format(first, "MMM"), days };
-    });
-  }, [year]);
-  function count(day: Date) {
-    const key = format(day, "yyyy-MM-dd");
-    return deals.filter((x) => (x.eventDate ?? "").slice(0, 10) === key).length;
-  }
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {months.map((mo) => (
-        <article key={mo.name} className="rounded-xl bg-card p-3 shadow-[var(--shadow-border)]">
-          <h3 className="mb-2 text-xs font-medium">{mo.name}</h3>
-          <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] text-muted-foreground">
-            {"SMTWTFS".split("").map((c, i) => (
-              <span key={i}>{c}</span>
-            ))}
-            {mo.days.map((day, i) => {
-              if (!day) return <span key={i} />;
-              const n = count(day);
-              return (
-                <span
-                  key={i}
-                  className={cn("rounded-sm py-0.5", n === 1 && "bg-primary/40", n > 1 && "bg-primary text-primary-foreground")}
-                >
-                  {day.getDate()}
-                </span>
-              );
-            })}
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function DayGantt({
-  deals,
-  activities,
-}: {
-  deals: { id: number; title: string; eventDate: string | null; venue: string | null; ownerName: string | null }[];
-  activities: { id: number; subject: string; dueAt: string | null; ownerName: string | null }[];
-}) {
-  const rows = deals.filter((d) => d.eventDate).slice(0, 10);
-  return (
-    <div className="overflow-x-auto px-4 pb-10 sm:px-6">
-      <p className="mb-2 text-sm text-muted-foreground">Gantt day — simultaneous shows and the activities sitting on them.</p>
-      <div className="min-w-[40rem] rounded-xl bg-card p-3 shadow-[var(--shadow-border)]">
-        {rows.map((d) => {
-          const hits = activities.filter((a) => a.subject.toLowerCase().includes(d.title.slice(0, 8).toLowerCase()) || a.ownerName === d.ownerName);
-          return (
-            <div key={d.id} className="grid grid-cols-[12rem_1fr] items-center gap-2 border-b border-border py-2 last:border-0">
-              <Link to="/deals/$dealId" params={{ dealId: String(d.id) }} className="truncate text-xs">
-                {d.title}
-              </Link>
-              <div className="relative h-7 rounded-sm bg-muted">
-                <span className="absolute inset-y-0 left-[20%] w-[55%] rounded-sm bg-primary/70" title={d.venue ?? ""} />
-                {hits.slice(0, 2).map((a, i) => (
-                  <span key={a.id} className="absolute top-0 h-2 w-8 rounded-sm bg-foreground/40" style={{ left: `${30 + i * 18}%` }} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

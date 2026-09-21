@@ -56,6 +56,9 @@ function mapEvent(r: Record<string, unknown>) {
     stage: r.stage_name == null ? null : String(r.stage_name),
     venue: r.venue == null ? null : String(r.venue),
     event_date: iso(r.event_date)?.slice(0, 10) ?? null,
+    event_type: r.event_type == null ? null : String(r.event_type),
+    source: r.source == null ? null : String(r.source),
+    lost_reason: r.lost_reason == null ? null : String(r.lost_reason),
     load_in: r.load_in == null ? null : String(r.load_in),
     guest_count: r.guest_count == null ? null : Number(r.guest_count),
     client: r.org_id == null ? null : { id: Number(r.org_id), name: String(r.org_name ?? "") },
@@ -348,6 +351,7 @@ export async function handleRest(request: Request): Promise<Response> {
       await fireWebhooks("deal.updated", data);
       if (status === "won" && String(cur.status) !== "won") await fireWebhooks("deal.won", data);
       if (status === "lost" && String(cur.status) !== "lost") await fireWebhooks("deal.lost", data);
+      if (status === "cancelled" && String(cur.status) !== "cancelled") await fireWebhooks("deal.cancelled", data);
       return json(200, { data });
     }
 

@@ -55,6 +55,7 @@ export function mapDeal(r: Record<string, unknown>): DealCard {
     indoor: r.indoor == null ? null : Boolean(r.indoor),
     loadIn: r.load_in == null ? null : String(r.load_in),
     source: r.source == null ? null : String(r.source),
+    eventType: r.event_type == null ? null : String(r.event_type),
     notes: r.notes == null ? null : String(r.notes),
     probability: r.probability == null ? Number(r.stage_probability ?? 0) : Number(r.probability),
     stageEnteredAt: iso(r.stage_entered_at),
@@ -82,11 +83,19 @@ export function mapLead(r: Record<string, unknown>): Lead {
     ownerInitials: r.owner_initials == null ? null : String(r.owner_initials),
     ownerTone: r.owner_tone == null ? null : String(r.owner_tone),
     source: String(r.source),
+    eventType: r.event_type == null ? null : String(r.event_type),
+    eventDate: iso(r.event_date),
+    venue: r.venue == null ? null : String(r.venue),
+    estimatedValue: money(r.estimated_value),
+    disqualifyReason: r.disqualify_reason == null ? null : String(r.disqualify_reason),
+    dealId: r.deal_id == null ? null : Number(r.deal_id),
     score: Number(r.score ?? 0),
     status: (r.status as Lead["status"]) ?? "new",
     labels: r.labels == null ? null : String(r.labels),
     notes: r.notes == null ? null : String(r.notes),
     createdAt: iso(r.created_at) ?? "",
+    stageEnteredAt: iso(r.stage_entered_at),
+    daysInStage: Math.max(0, Math.floor(Number(r.days_in_stage ?? 0))),
   };
 }
 
@@ -102,6 +111,7 @@ export function mapPerson(r: Record<string, unknown>): Person {
     ownerId: r.owner_id == null ? null : Number(r.owner_id),
     ownerName: r.owner_name == null ? null : String(r.owner_name),
     city: r.city == null ? null : String(r.city),
+    address: r.address == null ? null : String(r.address),
     lat: r.lat == null ? null : Number(r.lat),
     lng: r.lng == null ? null : Number(r.lng),
     createdAt: iso(r.created_at) ?? "",
@@ -237,6 +247,8 @@ export function mapEmail(r: Record<string, unknown>): EmailRow {
     scheduledAt: iso(r.scheduled_at),
     sentAt: iso(r.sent_at),
     createdAt: iso(r.created_at) ?? "",
+    authenticated: Boolean(r.authenticated),
+    domainId: r.domain_id == null ? null : Number(r.domain_id),
   };
 }
 
@@ -258,9 +270,9 @@ export function mapDoc(r: Record<string, unknown>): DocumentRow {
 
 export const DEAL_SELECT = `
   d.id, d.title, d.value, d.pipeline_id, d.stage_id, d.org_id, d.person_id, d.owner_id,
-  d.status, d.lost_reason, d.expected_close, d.probability, d.source, d.event_date,
+  d.status, d.lost_reason, d.expected_close, d.probability, d.source, d.event_type, d.event_date,
   d.venue, d.guest_count, d.indoor, d.load_in, d.notes, d.stage_entered_at,
-  d.created_at, d.updated_at, d.won_at, d.lost_at,
+  d.created_at, d.updated_at, d.won_at, d.lost_at, d.cancelled_at,
   o.name as org_name, p.name as person_name, p.email as person_email, p.phone as person_phone,
   o.address as org_address,
   m.name as owner_name, m.initials as owner_initials, m.tone as owner_tone,

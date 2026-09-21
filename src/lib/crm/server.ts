@@ -18,6 +18,7 @@ import {
   mapTask,
 } from "./map";
 import { completeNewBooking } from "./schedule";
+import { insertOutbound } from "./domain";
 import type {
   AuditRow,
   Automation,
@@ -54,6 +55,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).handler(async (): 
   const products = (await sql`select * from products order by category, name`).map(mapProduct);
   let lostReasons: Bootstrap["lostReasons"] = [];
   let activityTypes: Bootstrap["activityTypes"] = [];
+  let eventTypes: Bootstrap["eventTypes"] = [];
   try {
     const lostRows = await sql`select * from lost_reasons where active = true order by sort_order`;
     const typeRows = await sql`select * from activity_types where active = true order by id`;
@@ -62,6 +64,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).handler(async (): 
       name: String(r.name),
       sortOrder: Number(r.sort_order),
       active: Boolean(r.active),
+      kind: String(r.kind ?? "lost") === "cancelled" ? "cancelled" : "lost",
     }));
     activityTypes = typeRows.map((r) => ({
       id: Number(r.id),
@@ -72,6 +75,18 @@ export const getBootstrap = createServerFn({ method: "GET" }).handler(async (): 
     }));
   } catch {
     /* 0004 not applied yet */
+  }
+  try {
+    const typeCatalog = await sql`select * from event_types where active = true order by sort_order`;
+    eventTypes = typeCatalog.map((r) => ({
+      id: Number(r.id),
+      name: String(r.name),
+      slug: String(r.slug),
+      sortOrder: Number(r.sort_order),
+      active: Boolean(r.active),
+    }));
+  } catch {
+    /* 0023 not applied yet */
   }
   const pipelines = pipes.map((p) => ({
     id: Number(p.id),
@@ -94,6 +109,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).handler(async (): 
     products,
     lostReasons,
     activityTypes,
+    eventTypes,
   };
 });
 
@@ -218,12 +234,13 @@ export const createDeal = createServerFn({ method: "POST" })
       eventDate?: string | null;
       guestCount?: number | null;
       source?: string;
+      eventType?: string | null;
     }) => input,
   )
   .handler(async ({ data }) => {
     const sql = await getSql();
-    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, owner_id, org_id, person_id, venue, event_date, guest_count, source)
-      values (${data.title}, ${data.value}, ${data.pipelineId}, ${data.stageId}, ${data.ownerId}, ${data.orgId ?? null}, ${data.personId ?? null}, ${data.venue ?? null}, ${data.eventDate ?? null}, ${data.guestCount ?? null}, ${data.source ?? "Manual"})
+    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, owner_id, org_id, person_id, venue, event_date, guest_count, source, event_type)
+      values (${data.title}, ${data.value}, ${data.pipelineId}, ${data.stageId}, ${data.ownerId}, ${data.orgId ?? null}, ${data.personId ?? null}, ${data.venue ?? null}, ${data.eventDate ?? null}, ${data.guestCount ?? null}, ${data.source ?? "Manual"}, ${data.eventType ?? null})
       returning id`;
     const id = Number(rows[0]!.id);
     await audit("Northline", "created", `deal:${id}`, data.title);
@@ -242,11 +259,11 @@ export const moveDeal = createServerFn({ method: "POST" })
   });
 
 export const setDealStatus = createServerFn({ method: "POST" })
-  .validator((input: { id: number; status: "open" | "won" | "lost"; lostReason?: string }) => input)
+  .validator((input: { id: number; status: "open" | "won" | "lost" | "cancelled"; lostReason?: string }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
     if (data.status === "won") {
-      await sql`update deals set status = 'won', won_at = now(), probability = 100, updated_at = now() where id = ${data.id}`;
+      await sql`update deals set status = 'won', won_at = now(), cancelled_at = null, probability = 100, updated_at = now() where id = ${data.id}`;
       const deal = (await sql`select title, owner_id from deals where id = ${data.id}`)[0];
       if (deal) {
         await sql`insert into projects (name, deal_id, status, start_date, end_date, owner_id)
@@ -255,10 +272,13 @@ export const setDealStatus = createServerFn({ method: "POST" })
         await sql`insert into deal_history (deal_id, actor, action, detail) values (${data.id}, ${"Northline"}, ${"won"}, ${String(deal.title)})`;
       }
     } else if (data.status === "lost") {
-      await sql`update deals set status = 'lost', lost_reason = ${data.lostReason ?? "Unspecified"}, lost_at = now(), probability = 0, updated_at = now() where id = ${data.id}`;
+      await sql`update deals set status = 'lost', lost_reason = ${data.lostReason ?? "Unspecified"}, lost_at = now(), cancelled_at = null, probability = 0, updated_at = now() where id = ${data.id}`;
       await sql`insert into deal_history (deal_id, actor, action, detail) values (${data.id}, ${"Northline"}, ${"lost"}, ${data.lostReason ?? "Unspecified"})`;
+    } else if (data.status === "cancelled") {
+      await sql`update deals set status = 'cancelled', lost_reason = ${data.lostReason ?? "Event cancelled"}, lost_at = now(), cancelled_at = now(), probability = 0, updated_at = now() where id = ${data.id}`;
+      await sql`insert into deal_history (deal_id, actor, action, detail) values (${data.id}, ${"Northline"}, ${"cancelled"}, ${data.lostReason ?? "Event cancelled"})`;
     } else {
-      await sql`update deals set status = 'open', lost_reason = null, won_at = null, lost_at = null, updated_at = now() where id = ${data.id}`;
+      await sql`update deals set status = 'open', lost_reason = null, won_at = null, lost_at = null, cancelled_at = null, updated_at = now() where id = ${data.id}`;
     }
     await audit("Northline", "updated", `deal:${data.id}`, `Status ${data.status}`);
     return { ok: true };
@@ -278,6 +298,7 @@ export const updateDeal = createServerFn({ method: "POST" })
       loadIn?: string | null;
       notes?: string | null;
       expectedClose?: string | null;
+      eventType?: string | null;
     }) => input,
   )
   .handler(async ({ data }) => {
@@ -295,6 +316,7 @@ export const updateDeal = createServerFn({ method: "POST" })
       load_in = ${data.loadIn === undefined ? (cur.load_in as string | null) : data.loadIn},
       notes = ${data.notes === undefined ? (cur.notes as string | null) : data.notes},
       expected_close = ${data.expectedClose === undefined ? (cur.expected_close as string | null) : data.expectedClose},
+      event_type = ${data.eventType === undefined ? (cur.event_type as string | null) : data.eventType},
       updated_at = now()
       where id = ${data.id}`;
     return { ok: true };
@@ -332,7 +354,8 @@ export const addFileMeta = createServerFn({ method: "POST" })
 export const listLeads = createServerFn({ method: "GET" }).handler(async () => {
   const sql = await getSql();
   const rows = await sql`select l.*, p.name as person_name, p.email as person_email, o.name as org_name,
-    m.name as owner_name, m.initials as owner_initials, m.tone as owner_tone
+    m.name as owner_name, m.initials as owner_initials, m.tone as owner_tone,
+    extract(epoch from (now() - coalesce(l.stage_entered_at, l.created_at))) / 86400.0 as days_in_stage
     from leads l
     left join people p on p.id = l.person_id
     left join organizations o on o.id = l.org_id
@@ -348,29 +371,80 @@ export const convertLead = createServerFn({ method: "POST" })
     const sql = await getSql();
     const lead = (await sql`select * from leads where id = ${data.id}`)[0];
     if (!lead) return { id: null as number | null };
-    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, owner_id, org_id, person_id, source)
-      values (${String(lead.title)}, 0, ${data.pipelineId}, ${data.stageId}, ${lead.owner_id == null ? null : Number(lead.owner_id)}, ${lead.org_id == null ? null : Number(lead.org_id)}, ${lead.person_id == null ? null : Number(lead.person_id)}, ${String(lead.source)})
+    const value = money(lead.estimated_value);
+    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, owner_id, org_id, person_id, source, event_type, venue, event_date)
+      values (${String(lead.title)}, ${value}, ${data.pipelineId}, ${data.stageId}, ${lead.owner_id == null ? null : Number(lead.owner_id)}, ${lead.org_id == null ? null : Number(lead.org_id)}, ${lead.person_id == null ? null : Number(lead.person_id)}, ${String(lead.source)}, ${lead.event_type == null ? null : String(lead.event_type)}, ${lead.venue == null ? null : String(lead.venue)}, ${lead.event_date == null ? null : String(lead.event_date)})
       returning id`;
-    await sql`update leads set status = 'archived' where id = ${data.id}`;
-    return { id: Number(rows[0]!.id) };
+    const dealId = Number(rows[0]!.id);
+    await sql`update leads set status = 'converted', deal_id = ${dealId}, stage_entered_at = now() where id = ${data.id}`;
+    try {
+      await sql`insert into lead_history (lead_id, actor, action, detail) values (${data.id}, ${"Northline"}, ${"converted"}, ${`Deal ${dealId}`})`;
+    } catch {
+      /* 0023 */
+    }
+    return { id: dealId };
   });
 
 export const createLead = createServerFn({ method: "POST" })
-  .validator((input: { title: string; source: string; ownerId: number; notes?: string; labels?: string }) => input)
+  .validator(
+    (input: {
+      title: string;
+      source: string;
+      ownerId: number;
+      notes?: string;
+      labels?: string;
+      eventType?: string | null;
+      eventDate?: string | null;
+      venue?: string | null;
+      estimatedValue?: number;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const sql = await getSql();
-    const score = data.source === "Referral" ? 70 : data.source === "Prospector" ? 55 : 40;
-    const rows = await sql`insert into leads (title, source, owner_id, notes, labels, score) values (${data.title}, ${data.source}, ${data.ownerId}, ${data.notes ?? null}, ${data.labels ?? null}, ${score}) returning id`;
-    return { id: Number(rows[0]!.id) };
+    const score = data.source === "Referral" ? 70 : data.source === "Repeat" ? 65 : data.source === "Prospector" ? 55 : 40;
+    const rows = await sql`insert into leads (title, source, owner_id, notes, labels, score, event_type, event_date, venue, estimated_value)
+      values (${data.title}, ${data.source}, ${data.ownerId}, ${data.notes ?? null}, ${data.labels ?? null}, ${score}, ${data.eventType ?? null}, ${data.eventDate ?? null}, ${data.venue ?? null}, ${data.estimatedValue ?? 0}) returning id`;
+    const id = Number(rows[0]!.id);
+    try {
+      await sql`insert into lead_history (lead_id, actor, action, detail) values (${id}, ${"Northline"}, ${"new"}, ${data.source})`;
+    } catch {
+      /* 0023 */
+    }
+    return { id };
   });
 
 export const updateLead = createServerFn({ method: "POST" })
-  .validator((input: { id: number; status?: string; ownerId?: number; score?: number }) => input)
+  .validator(
+    (input: {
+      id: number;
+      status?: string;
+      ownerId?: number;
+      score?: number;
+      eventType?: string | null;
+      disqualifyReason?: string | null;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const sql = await getSql();
     const cur = (await sql`select * from leads where id = ${data.id}`)[0];
     if (!cur) return { ok: false };
-    await sql`update leads set status = ${data.status ?? String(cur.status)}, owner_id = ${data.ownerId ?? (cur.owner_id as number | null)}, score = ${data.score ?? Number(cur.score)} where id = ${data.id}`;
+    const nextStatus = data.status ?? String(cur.status);
+    const statusChanged = nextStatus !== String(cur.status);
+    await sql`update leads set
+      status = ${nextStatus},
+      owner_id = ${data.ownerId ?? (cur.owner_id as number | null)},
+      score = ${data.score ?? Number(cur.score)},
+      event_type = ${data.eventType === undefined ? (cur.event_type as string | null) : data.eventType},
+      disqualify_reason = ${data.disqualifyReason === undefined ? (cur.disqualify_reason as string | null) : data.disqualifyReason},
+      stage_entered_at = ${statusChanged ? new Date().toISOString() : (cur.stage_entered_at as string)}
+      where id = ${data.id}`;
+    if (statusChanged) {
+      try {
+        await sql`insert into lead_history (lead_id, actor, action, detail) values (${data.id}, ${"Northline"}, ${nextStatus}, ${data.disqualifyReason ?? nextStatus})`;
+      } catch {
+        /* 0023 */
+      }
+    }
     return { ok: true };
   });
 
@@ -560,13 +634,23 @@ export const sendEmail = createServerFn({ method: "POST" })
       body: string;
       dealId?: number | null;
       folder?: string;
+      memberId?: number | null;
     }) => input,
   )
   .handler(async ({ data }) => {
     const sql = await getSql();
-    await sql`insert into emails (folder, from_name, from_addr, to_addr, subject, body, deal_id, opened, clicked, sent_at)
-      values (${data.folder ?? "sent"}, ${data.fromName}, ${data.fromAddr}, ${data.toAddr}, ${data.subject}, ${data.body}, ${data.dealId ?? null}, false, false, now())`;
-    return { ok: true };
+    const sender = await insertOutbound(sql, {
+      purpose: "compose",
+      toAddr: data.toAddr,
+      subject: data.subject,
+      body: data.body,
+      dealId: data.dealId ?? null,
+      folder: data.folder ?? "sent",
+      memberId: data.memberId,
+      fallbackName: data.fromName,
+      hintAddr: data.fromAddr,
+    });
+    return { ok: true as const, fromName: sender.fromName, fromAddr: sender.fromAddr, authenticated: sender.authenticated };
   });
 
 export const listDocuments = createServerFn({ method: "GET" }).handler(async () => {

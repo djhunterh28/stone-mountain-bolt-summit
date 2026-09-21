@@ -3,6 +3,7 @@ import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { iso } from "@/lib/utils";
 import { ULTIMATE_LIMITS } from "./limits";
+import { sendClientBroadcast } from "./broadcast";
 import type {
   AccessPolicy,
   AccessState,
@@ -153,7 +154,7 @@ async function raiseAlert(severity: string, title: string, detail: string) {
   const sql = await getSql();
   await sql`insert into security_alerts (severity, title, detail, resolved) values (${severity}, ${title}, ${detail}, false)`;
   await sql`insert into notifications (member_id, kind, title, body, href, read)
-    values (${1}, ${"mention"}, ${title}, ${detail}, ${"/security"}, false)`;
+    values (${1}, ${"mention"}, ${title}, ${detail}, ${"/settings?tab=security"}, false)`;
 }
 
 export async function guardAction(kind: "export" | "mail" | "login") {
@@ -494,6 +495,9 @@ export const listBroadcasts = createServerFn({ method: "GET" })
         audience: String(b.audience),
         sentCount: Number(b.sent_count),
         opened: Number(b.opened),
+        suppressedCount: Number(b.suppressed_count ?? 0),
+        skipped: Number(b.skipped ?? 0),
+        fromAddr: b.from_addr == null ? null : String(b.from_addr),
         createdAt: iso(b.created_at) ?? "",
       }));
     } catch {
@@ -504,39 +508,22 @@ export const listBroadcasts = createServerFn({ method: "GET" })
 export const sendBroadcast = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(
-    (input: { name?: string; subject: string; body: string; audience: string; fromName: string; fromAddr: string }) =>
-      input,
+    (input: {
+      name?: string;
+      subject: string;
+      body: string;
+      audience: string;
+      fromName: string;
+      fromAddr: string;
+      memberId?: number | null;
+      templateId?: number | null;
+    }) => input,
   )
   .handler(async ({ data }) => {
     const blocked = await guardAction("mail");
-    if (!blocked.ok) return { ok: false, sent: 0, error: blocked.reason };
+    if (!blocked.ok) return { ok: false, sent: 0, suppressed: 0, skipped: 0, error: blocked.reason };
     const sql = await getSql();
-    let recipients: { name: string; email: string }[] = [];
-    if (data.audience === "leads") {
-      recipients = (
-        await sql`select coalesce(p.name, l.title) as name, p.email from leads l left join people p on p.id = l.person_id where l.status <> 'archived' and p.email is not null`
-      ).map((r) => ({ name: String(r.name), email: String(r.email) }));
-    } else if (data.audience === "rotting") {
-      recipients = (
-        await sql`select coalesce(p.name, d.title) as name, p.email from deals d left join people p on p.id = d.person_id
-          join stages s on s.id = d.stage_id
-          where d.status = 'open' and p.email is not null
-            and extract(day from now() - d.stage_entered_at) >= s.rotting_days`
-      ).map((r) => ({ name: String(r.name), email: String(r.email) }));
-    } else {
-      recipients = (
-        await sql`select coalesce(p.name, d.title) as name, p.email from deals d left join people p on p.id = d.person_id
-          where d.status = 'open' and p.email is not null`
-      ).map((r) => ({ name: String(r.name), email: String(r.email) }));
-    }
-    const unique = [...new Map(recipients.map((r) => [r.email, r])).values()].slice(0, 40);
-    for (const r of unique) {
-      await sql`insert into emails (folder, from_name, from_addr, to_addr, subject, body, opened, clicked, sent_at)
-        values (${"sent"}, ${data.fromName}, ${data.fromAddr}, ${r.email}, ${data.subject}, ${data.body}, false, false, now())`;
-    }
-    await sql`insert into mail_broadcasts (name, subject, body, audience, sent_count, opened)
-      values (${data.name || data.subject}, ${data.subject}, ${data.body}, ${data.audience}, ${unique.length}, ${0})`;
-    return { ok: true, sent: unique.length, error: null as string | null };
+    return sendClientBroadcast(sql, data);
   });
 
 export const createTeamInbox = createServerFn({ method: "POST" })

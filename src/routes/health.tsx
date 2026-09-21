@@ -2,26 +2,24 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { InquiryHeat } from "@/components/crm/unique-views";
 import { getHealth } from "@/lib/crm/ops";
+import { getUniqueViews } from "@/lib/crm/views";
 import { formatUsdFull } from "@/lib/utils";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/health")({ component: HealthPage });
 
-const DOW = ["S", "M", "T", "W", "T", "F", "S"];
-const MO = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
-
 function HealthPage() {
   const h = useQuery({ queryKey: ["health"], queryFn: () => getHealth() });
+  const desk = useQuery({ queryKey: ["unique-views"], queryFn: () => getUniqueViews() });
   const d = h.data;
-  const max = Math.max(1, ...(d?.heat.map((x) => x.n) ?? [1]));
   return (
     <div className="pb-12">
       <PageHeader title="Business health" subtitle="Booked-event audit, ghosted leads, win/loss, quote abandonment, inquiry heatmap." />
       <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-4 sm:px-6">
         <Stat label="Win rate" value={`${d?.winRate ?? "—"}%`} hint={`${d?.won ?? 0} won / ${d?.lost ?? 0} lost`} />
-        <Stat label="Open" value={String(d?.kpis.open ?? "—")} hint={d ? formatUsdFull(d.kpis.openValue) : ""} />
-        <Stat label="Won book" value={d ? formatUsdFull(d.kpis.wonValue) : "—"} hint="Signed shows" />
+        <Stat label="Lead conversion" value={`${d?.conversion ?? "—"}%`} hint={`${d?.leadConverted ?? 0} of ${d?.leadN ?? 0}`} />
+        <Stat label="Collected" value={d ? formatUsdFull(d.kpis.collected) : "—"} hint={d ? `of ${formatUsdFull(d.kpis.invoiced)} invoiced` : ""} />
         <Stat label="Abandoned quotes" value={String(d?.abandoned ?? "—")} hint={`${d?.quotes ?? 0} quotes total`} />
       </div>
       <section className="mx-4 mt-6 sm:mx-6">
@@ -52,31 +50,13 @@ function HealthPage() {
         </ul>
       </section>
       <section className="mx-4 mt-6 sm:mx-6">
-        <h2 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">Inquiry heatmap</h2>
-        <div className="overflow-x-auto rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
-          <div className="grid grid-cols-[2rem_repeat(12,1.5rem)] gap-1 text-[10px] text-muted-foreground">
-            <span />
-            {MO.map((m, i) => (
-              <span key={i} className="text-center">{m}</span>
-            ))}
-            {DOW.map((day, dow) => (
-              <>
-                <span key={`d${dow}`}>{day}</span>
-                {MO.map((_, month) => {
-                  const n = d?.heat.find((x) => x.month === month && x.dow === dow)?.n ?? 0;
-                  return (
-                    <span
-                      key={`${dow}-${month}`}
-                      title={`${n}`}
-                      className={cn("block h-6 rounded-sm", n === 0 ? "bg-muted" : "bg-primary")}
-                      style={{ opacity: n === 0 ? 1 : 0.25 + (n / max) * 0.75 }}
-                    />
-                  );
-                })}
-              </>
-            ))}
-          </div>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Inquiry heatmap</h2>
+          <Link to="/views" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+            Unique views
+          </Link>
         </div>
+        <InquiryHeat days={desk.data?.inquiry ?? []} />
       </section>
     </div>
   );

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,23 @@ import { createTeamInbox, getUsage } from "@/lib/crm/governance";
 import { ULTIMATE_LIMITS } from "@/lib/crm/limits";
 import { getBranding, saveBranding, syncPipedrive } from "@/lib/portal/server";
 import { getAiDesk, saveAiProfile } from "@/lib/crm/ops";
+import { ImportPanel } from "@/components/crm/import-panel";
+import { SandboxPanel } from "@/components/crm/sandbox-panel";
+import { AdminPanel } from "@/components/crm/admin-panel";
+import { SecurityPanel } from "@/components/crm/security-panel";
+import { MarketplacePanel } from "@/components/crm/marketplace-panel";
+import { STAFF_NAV, catalogFor } from "@/components/layout/sidebar-nav";
+import { getNavPrefs, insertBefore, mergeNavLayout, saveNavPrefs } from "@/lib/crm/prefs";
 import { useUi } from "@/lib/crm/store";
 import { THEME_OPTIONS, THEME_SWATCHES, type ThemePreference } from "@/lib/crm/theme";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/settings")({ component: SettingsPage });
+export const Route = createFileRoute("/settings")({
+  component: SettingsPage,
+  validateSearch: (s: Record<string, unknown>): { tab?: string } => ({
+    tab: typeof s.tab === "string" ? s.tab : undefined,
+  }),
+});
 
 const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
 
@@ -136,6 +148,8 @@ function IntegrationsPanel() {
 }
 
 function SettingsPage() {
+  const { tab } = Route.useSearch();
+  const navigate = useNavigate({ from: "/settings" });
   const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
   const fields = useQuery({ queryKey: ["fields"], queryFn: () => listFields() });
   const scores = useQuery({ queryKey: ["scores"], queryFn: () => listScores() });
@@ -147,11 +161,19 @@ function SettingsPage() {
 
   return (
     <div className="pb-12">
-      <PageHeader title="Settings" subtitle="Appearance, pipelines, fields, capacity, connectors, and team inboxes." />
+      <PageHeader title="Settings" subtitle="Appearance, sidebar, pipelines, import, sandbox, admin, security, marketplace, fields, capacity, connectors, and team inboxes." />
       <div className="px-4 sm:px-6">
-        <Tabs defaultValue="appearance">
+        <Tabs
+          value={tab ?? "appearance"}
+          onValueChange={(v) => void navigate({ search: { tab: v === "appearance" ? undefined : v } })}
+        >
           <TabsList className="flex h-auto flex-wrap">
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <TabsTrigger value="sidebar">Sidebar</TabsTrigger>
+            <TabsTrigger value="import">Import</TabsTrigger>
+            <TabsTrigger value="sandbox">Sandbox</TabsTrigger>
+            <TabsTrigger value="admin">Admin</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
             <TabsTrigger value="pipelines">Pipelines</TabsTrigger>
             <TabsTrigger value="fields">Fields</TabsTrigger>
             <TabsTrigger value="team">Team</TabsTrigger>
@@ -162,10 +184,26 @@ function SettingsPage() {
             <TabsTrigger value="api">API</TabsTrigger>
             <TabsTrigger value="scores">Scores</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
             <TabsTrigger value="portal">White-label</TabsTrigger>
           </TabsList>
           <TabsContent value="appearance" className="mt-4">
             <AppearancePanel />
+          </TabsContent>
+          <TabsContent value="sidebar" className="mt-4">
+            <SidebarPrefsPanel />
+          </TabsContent>
+          <TabsContent value="import" className="mt-4">
+            <ImportPanel />
+          </TabsContent>
+          <TabsContent value="sandbox" className="mt-4">
+            <SandboxPanel />
+          </TabsContent>
+          <TabsContent value="admin" className="mt-4">
+            <AdminPanel />
+          </TabsContent>
+          <TabsContent value="security" className="mt-4">
+            <SecurityPanel />
           </TabsContent>
           <TabsContent value="pipelines" className="mt-4 space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -318,7 +356,11 @@ function SettingsPage() {
           </TabsContent>
           <TabsContent value="mailboxes" className="mt-4">
             <p className="mb-3 text-sm text-muted-foreground">
-              5 synced accounts per user, plus {ULTIMATE_LIMITS.teamInboxes} shared team inboxes.
+              5 synced accounts per user, plus {ULTIMATE_LIMITS.teamInboxes} shared team inboxes. Outbound still leaves from the{" "}
+              <Link to="/domain" className="underline underline-offset-2">
+                authenticated sending domain
+              </Link>
+              .
             </p>
             <form
               className="mb-4 flex flex-wrap gap-2"
@@ -437,6 +479,9 @@ function SettingsPage() {
           <TabsContent value="integrations" className="mt-4 max-w-lg">
             <IntegrationsPanel />
           </TabsContent>
+          <TabsContent value="marketplace" className="mt-4">
+            <MarketplacePanel />
+          </TabsContent>
           <TabsContent value="portal" className="mt-4 max-w-lg">
             <PortalDomainPanel />
           </TabsContent>
@@ -446,9 +491,86 @@ function SettingsPage() {
   );
 }
 
-function PortalDomainPanel() {
-  const desk = useQuery({ queryKey: ["ai-desk"], queryFn: () => getAiDesk() });
+function SidebarPrefsPanel() {
+  const memberId = useUi((s) => s.memberId);
   const qc = useQueryClient();
+  const catalog = catalogFor(false);
+  const prefs = useQuery({
+    queryKey: ["nav-prefs", memberId],
+    queryFn: () => getNavPrefs({ data: { memberId } }),
+  });
+  const layout = mergeNavLayout(
+    catalog.map((i) => i.href),
+    prefs.data ?? { pins: [], order: [] },
+  );
+  const byHref = new Map(STAFF_NAV.map((i) => [i.href, i]));
+  const rows = layout.order.map((h) => byHref.get(h)).filter((i): i is (typeof STAFF_NAV)[number] => Boolean(i));
+
+  function persist(next: { pins: string[]; order: string[] }) {
+    const applied = mergeNavLayout(catalog.map((i) => i.href), next);
+    qc.setQueryData(["nav-prefs", memberId], applied);
+    void saveNavPrefs({ data: { memberId, ...applied } }).then(() => toast.success("Sidebar saved for this seat"));
+  }
+
+  return (
+    <div className="max-w-xl space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Order and pins are stored on your seat, not the company. Star a module to pin it to the top of the rail. Use
+        the arrows here or drag from Arrange sidebar.
+      </p>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => persist({ pins: [], order: catalog.map((i) => i.href) })}
+      >
+        Reset to default
+      </Button>
+      <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
+        {rows.map((item, i) => {
+          const pinned = layout.pins.includes(item.href);
+          return (
+            <li key={item.href} className="flex items-center gap-2 px-3 py-2 text-sm">
+              <button
+                type="button"
+                className={cn("size-7 rounded-sm", pinned ? "text-primary" : "text-muted-foreground")}
+                onClick={() =>
+                  persist({
+                    pins: pinned ? layout.pins.filter((h) => h !== item.href) : [...layout.pins, item.href],
+                    order: layout.order,
+                  })
+                }
+                aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+              >
+                <Star className={cn("mx-auto size-3.5", pinned && "fill-current")} />
+              </button>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {pinned && <Badge variant="steel">pinned</Badge>}
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={i === 0}
+                onClick={() => persist({ pins: layout.pins, order: insertBefore(layout.order, item.href, rows[i - 1]?.href ?? null) })}
+                aria-label={`Move ${item.label} up`}
+              >
+                <ChevronUp className="size-3.5" />
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={i === rows.length - 1}
+                onClick={() => persist({ pins: layout.pins, order: insertBefore(layout.order, item.href, rows[i + 2]?.href ?? null) })}
+                aria-label={`Move ${item.label} down`}
+              >
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+  const desk = useQuery({ queryKey: ["ai-desk"], queryFn: () => getAiDesk() });
   const p = desk.data?.profile;
   if (!p) return <p className="text-sm text-muted-foreground">Loading portal domain…</p>;
   return (
@@ -457,25 +579,9 @@ function PortalDomainPanel() {
       <p className="text-sm text-muted-foreground">
         Clients hit your domain. Logo and colors follow the company profile. They never see a third-party address.
       </p>
-      <Input
-        defaultValue={p.portalDomain}
-        onBlur={(e) => {
-          if (e.target.value === p.portalDomain) return;
-          void saveAiProfile({
-            data: {
-              tone: p.tone,
-              specialties: p.specialties,
-              serviceArea: p.serviceArea,
-              greeting: p.greeting,
-              packages: JSON.stringify(p.packages),
-              portalDomain: e.target.value,
-            },
-          }).then(() => {
-            toast.success("Portal domain saved");
-            qc.invalidateQueries({ queryKey: ["ai-desk"] });
-          });
-        }}
-      />
+      <Button asChild size="sm" variant="secondary">
+        <Link to="/portal-domain">Open portal domain desk</Link>
+      </Button>
       <p className="text-xs text-muted-foreground">Live as https://{p.portalDomain} · brand #{p.brandColor}</p>
     </article>
   );

@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/domain",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 18,
+      "bodyTextHash": "18403a919f05983e105534050645325da0f96559b552d36c0b1d1b2d7a6617c9",
+      "bodyTextPrefix": "Loading the house…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/domain-desk.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 440,
+      "bodyTextHash": "883763e0cb13803f50525e580094524bfa2ca247b9e27f6686634a79e78f8b7e",
+      "bodyTextPrefix": "Northline Sign in Email is the username. Google sign-in is one c",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/domain-desk-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/domain-desk.json"
+}

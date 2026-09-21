@@ -3,6 +3,7 @@ import { getSql } from "@/lib/db";
 import { iso, money } from "@/lib/utils";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { runAi } from "./ai";
+import { deliverSms } from "./sms";
 
 function parseJson<T>(raw: unknown, fallback: T): T {
   if (typeof raw !== "string") return (raw as T) ?? fallback;
@@ -56,11 +57,15 @@ export const getAiDesk = createServerFn({ method: "GET" })
         specialties: String(p?.specialties ?? ""),
         serviceArea: String(p?.service_area ?? ""),
         greeting: String(p?.greeting ?? ""),
-        brandColor: String(p?.brand_color ?? "b7c0cc"),
+        brandColor: String(p?.brand_color ?? "0D47A1"),
         packages: parseJson<string[]>(p?.packages, []),
         faqs: parseJson<Faq[]>(p?.faqs, []),
         widgetSlug: String(p?.widget_slug ?? "northline"),
-        portalDomain: String(p?.portal_domain ?? "portal.northline.av"),
+        portalDomain: String(p?.portal_domain ?? "portal.hurricaneproductionsllc.com"),
+        mailConnected: p?.mail_connected !== false,
+        mailProvider: String(p?.mail_provider ?? "gmail"),
+        vertical: String(p?.vertical ?? "live entertainment"),
+        company: String(p?.company ?? "Hurricane Productions"),
       },
       drafts,
       findings,
@@ -79,13 +84,27 @@ export const saveAiProfile = createServerFn({ method: "POST" })
       packages: string;
       faqsJson?: string;
       portalDomain?: string;
+      mailConnected?: boolean;
+      mailProvider?: string;
     }) => input,
   )
   .handler(async ({ data }) => {
     const sql = await getSql();
     await sql.query(
-      `update ai_profile set tone = $1, specialties = $2, service_area = $3, greeting = $4, packages = $5, portal_domain = coalesce($6, portal_domain) where id = 1`,
-      [data.tone, data.specialties, data.serviceArea, data.greeting, data.packages, data.portalDomain ?? null],
+      `update ai_profile set tone = $1, specialties = $2, service_area = $3, greeting = $4, packages = $5,
+         portal_domain = coalesce($6, portal_domain), faqs = coalesce($7, faqs),
+         mail_connected = coalesce($8, mail_connected), mail_provider = coalesce($9, mail_provider) where id = 1`,
+      [
+        data.tone,
+        data.specialties,
+        data.serviceArea,
+        data.greeting,
+        data.packages,
+        data.portalDomain ?? null,
+        data.faqsJson ?? null,
+        data.mailConnected ?? null,
+        data.mailProvider ?? null,
+      ],
     );
     return { ok: true };
   });
@@ -137,7 +156,7 @@ export const draftFromDeal = createServerFn({ method: "POST" })
         prompt: `Tone: ${profile?.tone}. ${data.prompt}. Client ${ctx.client}, event ${ctx.event} at ${ctx.venue} on ${ctx.event_date}. Sign as ${ctx.ae}.`,
       },
     });
-    if (ai.ok && ai.text) body = `${ai.text}\n\n${ctx.signature}`;
+    if (ai.ok && ai.text) body = fillTags(`${ai.text}\n\n{{signature}}`, ctx);
     await sql.query(`insert into ai_drafts (deal_id, prompt, body, tone) values ($1,$2,$3,$4)`, [
       data.dealId,
       data.prompt,
@@ -145,6 +164,129 @@ export const draftFromDeal = createServerFn({ method: "POST" })
       String(profile?.tone ?? "professional"),
     ]);
     return { ok: true as const, body };
+  });
+
+export const sendAiDraft = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const row = (
+      await sql.query(
+        `select d.*, deals.person_id, deals.title as deal_title, p.email, p.name as person
+         from ai_drafts d
+         left join deals on deals.id = d.deal_id
+         left join people p on p.id = deals.person_id
+         where d.id = $1`,
+        [data.id],
+      )
+    )[0];
+    if (!row) return { ok: false as const, error: "Draft not found" };
+    const to = row.email ? String(row.email) : null;
+    if (!to) return { ok: false as const, error: "No client email on the event" };
+    const { insertOutbound } = await import("./domain");
+    await insertOutbound(sql, {
+      purpose: "compose",
+      mailKind: "compose",
+      toAddr: to,
+      subject: `Re: ${String(row.deal_title ?? "your event")}`,
+      body: String(row.body),
+      dealId: row.deal_id == null ? null : Number(row.deal_id),
+      personId: row.person_id == null ? null : Number(row.person_id),
+      fallbackName: "Hurricane Productions",
+      hintAddr: "shows@hurricaneproductionsllc.com",
+    });
+    await sql.query(`update ai_drafts set sent = true where id = $1`, [data.id]);
+    return { ok: true as const, error: null as string | null };
+  });
+
+export const runPrepInspector = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const sql = await getSql();
+    const profile = (await sql`select * from ai_profile where id = 1`)[0];
+    const deals = await sql.query(
+      `select d.*, p.name as person_name, p.email as person_email, o.name as org_name
+       from deals d
+       left join people p on p.id = d.person_id
+       left join organizations o on o.id = d.org_id
+       where d.status in ('open','won')`,
+    );
+    const emails = await sql.query(`select deal_id, subject, body from emails where deal_id is not null order by id desc limit 80`);
+    const byPerson = new Map<number, { id: number; title: string; date: string }[]>();
+    for (const d of deals) {
+      const pid = d.person_id == null ? null : Number(d.person_id);
+      const date = d.event_date ? String(d.event_date).slice(0, 10) : "";
+      if (!pid || !date) continue;
+      const list = byPerson.get(pid) ?? [];
+      list.push({ id: Number(d.id), title: String(d.title), date });
+      byPerson.set(pid, list);
+    }
+    let added = 0;
+    for (const d of deals) {
+      const id = Number(d.id);
+      const gaps: { kind: string; severity: string; detail: string; source: string }[] = [];
+      if (!d.load_in) gaps.push({ kind: "timed section", severity: "warn", detail: "Load-in is empty on the record.", source: "record" });
+      if (!d.event_date) gaps.push({ kind: "timed section", severity: "warn", detail: "Event date is empty — cannot place it on the calendar.", source: "record" });
+      if (!d.venue) gaps.push({ kind: "timed section", severity: "warn", detail: "Venue is blank — cannot lock a dock time.", source: "record" });
+      if (money(d.value) === 0 && String(d.status) === "won") {
+        gaps.push({ kind: "zero book", severity: "risk", detail: "Signed book sits at $0.", source: "record" });
+      }
+      const pid = d.person_id == null ? null : Number(d.person_id);
+      const date = d.event_date ? String(d.event_date).slice(0, 10) : "";
+      if (pid && date) {
+        const clash = (byPerson.get(pid) ?? []).find((x) => x.id !== id && x.date === date);
+        if (clash) {
+          gaps.push({
+            kind: "conflicting contact",
+            severity: "risk",
+            detail: `${d.person_name ?? "This client"} is also on ${clash.title} the same night.`,
+            source: "record",
+          });
+        }
+      }
+      const mail = emails.filter((e) => Number(e.deal_id) === id);
+      const blob = `${d.notes ?? ""} ${mail.map((e) => `${e.subject} ${e.body}`).join(" ")}`.toLowerCase();
+      if (profile?.mail_connected) {
+        if (/mashup|last dance|closer song|walk.?out/.test(blob) && !/on the plot|on plot/.test(blob)) {
+          gaps.push({
+            kind: "burn-risk closer",
+            severity: "risk",
+            detail: "Connected mail mentions a closer or mashup that is not on the plot.",
+            source: "email",
+          });
+        }
+        if (/two pm|conflicting|wrong contact|cc.?d the other/.test(blob)) {
+          gaps.push({
+            kind: "conflicting contact",
+            severity: "warn",
+            detail: "Mail names a second day-of contact that is not on the event record.",
+            source: "email",
+          });
+        }
+      }
+      if (String(profile?.vertical ?? "").toLowerCase().includes("dj") && !/closer|last dance/.test(String(d.notes ?? "").toLowerCase())) {
+        gaps.push({
+          kind: "timed section",
+          severity: "warn",
+          detail: "DJ book — no closer / last-dance note on the record.",
+          source: "record",
+        });
+      }
+      for (const g of gaps) {
+        const have = await sql.query(`select id from prep_findings where deal_id = $1 and kind = $2 and dismissed = false`, [id, g.kind]);
+        if (have[0]) continue;
+        await sql.query(`insert into prep_findings (deal_id, kind, severity, detail, source) values ($1,$2,$3,$4,$5)`, [
+          id,
+          g.kind,
+          g.severity,
+          g.detail,
+          g.source,
+        ]);
+        added += 1;
+      }
+    }
+    return { ok: true as const, added, vertical: String(profile?.vertical ?? "live entertainment") };
   });
 
 export const markFinding = createServerFn({ method: "POST" })
@@ -164,15 +306,30 @@ export const widgetAsk = createServerFn({ method: "POST" })
     const p = (await sql`select * from ai_profile where id = 1`)[0];
     const faqs = parseJson<Faq[]>(p?.faqs, []);
     const q = data.question.toLowerCase();
-    let answer = String(p?.greeting ?? "Northline — live event AV.");
+    const pkgs = parseJson<string[]>(p?.packages, []);
+    const held = (
+      await sql`select event_date, venue, title from deals where event_date is not null and status in ('open','won') order by event_date limit 8`
+    ).map((d) => ({
+      date: String(d.event_date).slice(0, 10),
+      venue: d.venue == null ? null : String(d.venue),
+      title: String(d.title),
+    }));
+    let answer = String(p?.greeting ?? "Hurricane Productions — live event AV.");
     const hit = faqs.find((f) => q.includes(f.q.toLowerCase().slice(0, 12)) || f.q.toLowerCase().split(" ").some((w) => w.length > 4 && q.includes(w)));
     if (hit) answer = hit.a;
-    else if (q.includes("price") || q.includes("cost"))
-      answer = "Town halls typically start around $28k. A 10% retainer holds crew and truck for 14 days.";
-    else if (q.includes("available") || q.includes("free") || q.includes("date") || q.includes("october"))
-      answer = "Pier 17 is open that Saturday. Cipriani 42nd is held. I can book a 30m intro on Dana's Calendly.";
-    else if (q.includes("area") || q.includes("brooklyn") || q.includes("nyc")) answer = String(p?.service_area ?? answer);
-    const lead = /book|hold|date|october|available/.test(q);
+    else if (q.includes("price") || q.includes("cost") || q.includes("package"))
+      answer = pkgs.length
+        ? `Packages we surface: ${pkgs.join(", ")}. Town halls typically start around $28k. A 10% retainer holds crew and truck for 14 days.`
+        : "Town halls typically start around $28k. A 10% retainer holds crew and truck for 14 days.";
+    else if (q.includes("available") || q.includes("free") || q.includes("date") || q.includes("hold") || q.includes("october") || q.includes("book")) {
+      const conflict = held.find((h) => q.includes(h.date.slice(5)) || (h.venue && q.includes(h.venue.toLowerCase().split(" ")[0]!)));
+      answer = conflict
+        ? `${conflict.venue ?? "That room"} is held for ${conflict.title} on ${conflict.date}. I can look at the next open Saturday.`
+        : held.length
+          ? `Live calendar: ${held.map((h) => `${h.date} · ${h.venue ?? h.title}`).join("; ")}. Tell me a date and I'll hold it.`
+          : "The book is open that weekend. I can lock a 30-minute intro.";
+    } else if (q.includes("area") || q.includes("brooklyn") || q.includes("nyc")) answer = String(p?.service_area ?? answer);
+    const lead = /book|hold|date|october|available|package/.test(q);
     await sql.query(`insert into widget_chats (visitor, question, answer, lead_captured) values ($1,$2,$3,$4)`, [
       data.visitor ?? "web",
       data.question,
@@ -195,19 +352,20 @@ export const getHealth = createServerFn({ method: "GET" })
     const deals = await sql`select d.*, s.name as stage_name from deals d left join stages s on s.id = d.stage_id`;
     const invoices = await sql`select * from invoices`;
     const quotes = await sql`select * from quotes`;
+    const envelopes = await sql`select deal_id, status from esign_envelopes`;
+    const leads = await sql`select status from leads`;
     const won = deals.filter((d) => String(d.status) === "won");
     const lost = deals.filter((d) => String(d.status) === "lost");
     const open = deals.filter((d) => String(d.status) === "open");
-    const flags = won
+    const booked = deals.filter((d) => String(d.status) === "won" || /sign|invoice/i.test(String(d.stage_name ?? "")));
+    const flags = booked
       .map((d) => {
         const inv = invoices.filter((i) => Number(i.deal_id) === Number(d.id));
-        const noContract = !inv.length;
-        const zero = inv.some((i) => money(i.amount) === 0);
-        const noPay = inv.every((i) => String(i.status) !== "paid" && String(i.status) !== "partial") && inv.length === 0;
+        const signed = envelopes.some((e) => Number(e.deal_id) === Number(d.id) && String(e.status) === "completed");
         const issues: string[] = [];
-        if (noContract) issues.push("no signed contract");
-        if (noPay) issues.push("no payment schedule");
-        if (zero) issues.push("signed at $0");
+        if (!signed) issues.push("no signed contract");
+        if (!inv.length) issues.push("no payment schedule");
+        if (money(d.value) === 0 || inv.some((i) => money(i.amount) === 0)) issues.push("signed at $0");
         return { id: Number(d.id), title: String(d.title), issues };
       })
       .filter((f) => f.issues.length);
@@ -227,6 +385,8 @@ export const getHealth = createServerFn({ method: "GET" })
       else heat.push({ month, dow, n: 1 });
     }
     const closed = won.length + lost.length;
+    const leadN = leads.length;
+    const leadConverted = leads.filter((l) => String(l.status) === "converted").length;
     return {
       flags,
       ghosted: ghosted.map((d) => ({ id: Number(d.id), title: String(d.title), days: Math.floor((Date.now() - new Date(String(d.stage_entered_at)).getTime()) / 86400000) })),
@@ -236,10 +396,15 @@ export const getHealth = createServerFn({ method: "GET" })
       abandoned,
       quotes: quotes.length,
       heat,
+      conversion: leadN ? Math.round((leadConverted / leadN) * 100) : 0,
+      leadN,
+      leadConverted,
       kpis: {
         open: open.length,
         wonValue: won.reduce((s, d) => s + money(d.value), 0),
         openValue: open.reduce((s, d) => s + money(d.value), 0),
+        invoiced: invoices.reduce((s, i) => s + money(i.amount), 0),
+        collected: invoices.filter((i) => String(i.status) === "paid").reduce((s, i) => s + money(i.amount), 0),
       },
     };
   });
@@ -298,22 +463,39 @@ export const listEventNotes = createServerFn({ method: "GET" })
 
 export const addEventNote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { dealId: number; body: string; category: string; pinned?: boolean }) => input)
+  .validator((input: { dealId: number; body: string; category: string; pinned?: boolean; authorId?: number }) => input)
   .handler(async ({ data }) => {
-    await (await getSql()).query(`insert into event_notes (deal_id, body, category, pinned, author_id) values ($1,$2,$3,$4,1)`, [
-      data.dealId,
-      data.body,
-      data.category,
-      Boolean(data.pinned),
-    ]);
-    return { ok: true };
+    const body = data.body.trim();
+    if (!body) return { ok: false as const };
+    await (await getSql()).query(
+      `insert into event_notes (deal_id, body, category, pinned, author_id) values ($1,$2,$3,$4,$5)`,
+      [data.dealId, body, data.category, Boolean(data.pinned), data.authorId ?? 1],
+    );
+    return { ok: true as const };
+  });
+
+export const updateEventNote = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: number; body?: string; category?: string; pinned?: boolean }) => input)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    if (data.body != null) {
+      await sql.query(`update event_notes set body = $2, updated_at = now() where id = $1`, [data.id, data.body]);
+    }
+    if (data.category != null) {
+      await sql.query(`update event_notes set category = $2, updated_at = now() where id = $1`, [data.id, data.category]);
+    }
+    if (data.pinned != null) {
+      await sql.query(`update event_notes set pinned = $2, updated_at = now() where id = $1`, [data.id, data.pinned]);
+    }
+    return { ok: true as const };
   });
 
 export const pinNote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { id: number; pinned: boolean }) => input)
   .handler(async ({ data }) => {
-    await (await getSql()).query(`update event_notes set pinned = $1 where id = $2`, [data.pinned, data.id]);
+    await (await getSql()).query(`update event_notes set pinned = $1, updated_at = now() where id = $2`, [data.pinned, data.id]);
     return { ok: true };
   });
 
@@ -646,14 +828,7 @@ export const sendSms = createServerFn({ method: "POST" })
   .validator((input: { personId: number; body: string; dealId?: number }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    const opt = (await sql.query(`select opted_in from sms_optins where person_id = $1`, [data.personId]))[0];
-    if (opt && !opt.opted_in) return { ok: false as const, error: "Suppressed — no SMS opt-in" };
-    await sql.query(`insert into sms_messages (person_id, deal_id, direction, body, status) values ($1,$2,'out',$3,'delivered')`, [
-      data.personId,
-      data.dealId ?? null,
-      data.body,
-    ]);
-    return { ok: true as const };
+    return deliverSms(sql, { personId: data.personId, dealId: data.dealId, body: data.body, kind: "custom" });
   });
 
 export const getQuotes = createServerFn({ method: "GET" })
@@ -740,115 +915,7 @@ export const webcalBody = async (token: string) => {
   return lines.join("\r\n");
 };
 
-export const getUnifiedInbox = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async () => {
-    const sql = await getSql();
-    const emails = await sql`select e.*, d.title as deal_title, p.name as person_name
-      from emails e left join deals d on d.id = e.deal_id left join people p on p.id = e.person_id
-      order by coalesce(e.sent_at, e.created_at) desc limit 40`;
-    const sms = await sql`select s.*, p.name as person, d.title as deal from sms_messages s
-      left join people p on p.id = s.person_id left join deals d on d.id = s.deal_id order by s.id desc limit 24`;
-    const chats = await sql`select * from chats order by updated_at desc limit 12`;
-    const chatMsgs = await sql`select * from chat_messages order by created_at`;
-    type Msg = { id: string; who: string; body: string; at: string; mine: boolean };
-    type Thread = {
-      id: string;
-      channel: "email" | "sms" | "chat";
-      title: string;
-      subtitle: string;
-      preview: string;
-      at: string;
-      dealId: number | null;
-      dealTitle: string | null;
-      personId: number | null;
-      toAddr: string | null;
-      messages: Msg[];
-    };
-    const threads: Thread[] = [];
-    const mailGroups = new Map<string, typeof emails>();
-    for (const e of emails) {
-      const key = String(e.deal_id ?? e.to_addr ?? e.id);
-      const list = mailGroups.get(key) ?? [];
-      list.push(e);
-      mailGroups.set(key, list);
-    }
-    for (const [key, list] of mailGroups) {
-      const last = list[0];
-      threads.push({
-        id: `mail-${key}`,
-        channel: "email",
-        title: String(last.subject ?? "No subject"),
-        subtitle: String(last.person_name ?? last.to_addr ?? last.from_name ?? "Mail"),
-        preview: String(last.body ?? "").slice(0, 120),
-        at: iso(last.sent_at ?? last.created_at) ?? "",
-        dealId: last.deal_id == null ? null : Number(last.deal_id),
-        dealTitle: last.deal_title == null ? null : String(last.deal_title),
-        personId: last.person_id == null ? null : Number(last.person_id),
-        toAddr: last.to_addr == null ? null : String(last.to_addr),
-        messages: [...list].reverse().map((m) => ({
-          id: `e${m.id}`,
-          who: String(m.from_name ?? m.from_addr ?? "mail"),
-          body: String(m.body ?? ""),
-          at: iso(m.sent_at ?? m.created_at) ?? "",
-          mine: String(m.folder) === "sent",
-        })),
-      });
-    }
-    const smsGroups = new Map<string, typeof sms>();
-    for (const s of sms) {
-      const key = String(s.person_id ?? s.id);
-      const list = smsGroups.get(key) ?? [];
-      list.push(s);
-      smsGroups.set(key, list);
-    }
-    for (const [key, list] of smsGroups) {
-      const last = list[0];
-      threads.push({
-        id: `sms-${key}`,
-        channel: "sms",
-        title: String(last.person ?? "SMS"),
-        subtitle: "QUO · SMS",
-        preview: String(last.body ?? "").slice(0, 120),
-        at: iso(last.created_at) ?? "",
-        dealId: last.deal_id == null ? null : Number(last.deal_id),
-        dealTitle: last.deal == null ? null : String(last.deal),
-        personId: last.person_id == null ? null : Number(last.person_id),
-        toAddr: null,
-        messages: [...list].reverse().map((m) => ({
-          id: `s${m.id}`,
-          who: String(m.direction) === "out" ? "Northline" : String(m.person ?? "them"),
-          body: String(m.body),
-          at: iso(m.created_at) ?? "",
-          mine: String(m.direction) === "out",
-        })),
-      });
-    }
-    for (const c of chats) {
-      const msgs = chatMsgs.filter((m) => Number(m.chat_id) === Number(c.id));
-      threads.push({
-        id: `chat-${c.id}`,
-        channel: "chat",
-        title: String(c.visitor_name),
-        subtitle: String(c.source ?? "widget"),
-        preview: String(c.last_message ?? ""),
-        at: iso(c.updated_at) ?? "",
-        dealId: null,
-        dealTitle: null,
-        personId: null,
-        toAddr: c.visitor_email == null ? null : String(c.visitor_email),
-        messages: msgs.map((m) => ({
-          id: `c${m.id}`,
-          who: String(m.sender),
-          body: String(m.body),
-          at: iso(m.created_at) ?? "",
-          mine: String(m.sender) !== "visitor",
-        })),
-      });
-    }
-    threads.sort((a, b) => (a.at < b.at ? 1 : -1));
-    return { threads };
-  });
+export { getUnifiedInbox } from "./inbox";
 
 export const getPersonPrefs = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -903,10 +970,15 @@ export const getPublicWidget = createServerFn({ method: "GET" })
     if (data.slug && p && String(p.widget_slug) !== data.slug) {
       /* still serve Northline — one house widget */
     }
+    const held = (
+      await sql`select event_date, venue from deals where event_date is not null and status in ('open','won') order by event_date limit 6`
+    ).map((d) => `${String(d.event_date).slice(0, 10)}${d.venue ? ` · ${d.venue}` : ""}`);
     return {
-      greeting: String(p?.greeting ?? "Northline here — LED, audio, and labor for live events."),
-      brandColor: String(p?.brand_color ?? "b7c0cc"),
+      greeting: String(p?.greeting ?? "Hurricane Productions — LED, audio, and labor for live events."),
+      brandColor: String(p?.brand_color ?? "0D47A1"),
       packages: parseJson<string[]>(p?.packages, []),
       slug: String(p?.widget_slug ?? "northline"),
+      company: String(p?.company ?? "Hurricane Productions"),
+      held,
     };
   });

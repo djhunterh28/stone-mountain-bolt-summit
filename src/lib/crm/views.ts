@@ -62,6 +62,7 @@ export const getUniqueViews = createServerFn({ method: "GET" })
       `select d.id, d.title, d.venue, d.event_date, d.load_in, d.status, d.indoor, d.guest_count, d.value, m.name as owner_name
        from deals d left join members m on m.id = d.owner_id
        where d.event_date is not null
+         and d.status not in ('lost', 'cancelled')
        order by d.event_date`,
     );
     const shows: ViewShow[] = dealRows.map((d) => {

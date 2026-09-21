@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/h/nlh_atlantic7",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 47,
+      "bodyTextHash": "409e35d2c2be6f9ae546a1b7ff0c01ff050105757b1e0f106cbe0b428c395744",
+      "bodyTextPrefix": "Northline EVENT HAND-OFF PACK Loading the pack…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/handoff-pack.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Northline",
+      "hasCanvas": false,
+      "bodyTextLen": 47,
+      "bodyTextHash": "409e35d2c2be6f9ae546a1b7ff0c01ff050105757b1e0f106cbe0b428c395744",
+      "bodyTextPrefix": "Northline EVENT HAND-OFF PACK Loading the pack…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/handoff-pack-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/handoff-pack.json"
+}

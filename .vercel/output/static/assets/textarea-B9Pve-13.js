@@ -1,1 +1,0 @@
-import{t as e}from"./react-SIfiwpqq.js";import{d as t,r as n}from"./preload-helper-CD4nqO4H.js";e();var r=t();function i({className:e,...t}){return(0,r.jsx)(`textarea`,{className:n(`flex min-h-24 w-full rounded-md bg-secondary px-3 py-2 text-sm text-foreground shadow-[var(--shadow-border)] placeholder:text-muted-foreground disabled:opacity-50`,e),...t})}export{i as t};

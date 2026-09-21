@@ -3,7 +3,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Filter, LayoutList } from "lucide-react";
 import { getBootstrap, listDeals, moveDeal, exportDealsCsv } from "@/lib/crm/server";
+import { getPipelineColWidths, savePipelineColWidths } from "@/lib/crm/prefs";
 import { formatUsd, formatUsdFull } from "@/lib/utils";
+import { useUi } from "@/lib/crm/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,9 +31,13 @@ function PipelinePage() {
   const qc = useQueryClient();
   const [status, setStatus] = useState("open");
   const [owner, setOwner] = useState<string>("all");
+  const [eventType, setEventType] = useState<string>("all");
+  const [source, setSource] = useState<string>("all");
   const [q, setQ] = useState("");
   const [view, setView] = useState<"board" | "list">("board");
   const [mounted, setMounted] = useState(false);
+  const [colWidths, setColWidths] = useState<Record<number, number>>({});
+  const { memberId } = useUi();
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     if (dealParam) {
@@ -56,13 +62,32 @@ function PipelinePage() {
       }),
     enabled: !!pipeline,
   });
+  const colPrefs = useQuery({
+    queryKey: ["pipeline-cols", memberId, pipelineId],
+    queryFn: () => getPipelineColWidths({ data: { memberId, pipelineId } }),
+    enabled: !!pipeline,
+  });
+  useEffect(() => {
+    setColWidths(colPrefs.data?.widths ?? {});
+  }, [colPrefs.data, memberId, pipelineId]);
+
+  function commitWidths(next: Record<number, number>) {
+    setColWidths(next);
+    void savePipelineColWidths({ data: { memberId, pipelineId, widths: next } }).then(() => {
+      void qc.invalidateQueries({ queryKey: ["pipeline-cols", memberId, pipelineId] });
+    });
+  }
 
   const moveMut = useMutation({
     mutationFn: ({ id, stageId }: { id: number; stageId: number }) => moveDeal({ data: { id, stageId } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["deals"] }),
   });
 
-  const list = deals.data ?? [];
+  const list = (deals.data ?? []).filter((d) => {
+    if (eventType !== "all" && d.eventType !== eventType) return false;
+    if (source !== "all" && d.source !== source) return false;
+    return true;
+  });
   const stats = useMemo(() => {
     const open = list.filter((d) => d.status === "open");
     const value = open.reduce((s, d) => s + d.value, 0);
@@ -114,6 +139,7 @@ function PipelinePage() {
             <TabsTrigger value="open">Open</TabsTrigger>
             <TabsTrigger value="won">Won</TabsTrigger>
             <TabsTrigger value="lost">Lost</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
             <TabsTrigger value="all">All</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -127,6 +153,32 @@ function PipelinePage() {
             {(boot.data?.members ?? []).map((m) => (
               <SelectItem key={m.id} value={String(m.id)}>
                 {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={eventType} onValueChange={setEventType}>
+          <SelectTrigger className="h-9 w-44">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {(boot.data?.eventTypes ?? []).map((t) => (
+              <SelectItem key={t.id} value={t.name}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={source} onValueChange={setSource}>
+          <SelectTrigger className="h-9 w-36">
+            <SelectValue placeholder="Source" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            {Array.from(new Set((deals.data ?? []).map((d) => d.source).filter(Boolean) as string[])).map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
               </SelectItem>
             ))}
           </SelectContent>
@@ -149,6 +201,11 @@ function PipelinePage() {
             <LayoutList className="size-3.5" />
             {view === "board" ? "List" : "Board"}
           </Button>
+          {view === "board" && Object.keys(colWidths).length > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => commitWidths({})}>
+              Reset widths
+            </Button>
+          )}
           <Button size="sm" variant="secondary" onClick={onExport}>
             <Download className="size-3.5" />
             Export
@@ -167,6 +224,9 @@ function PipelinePage() {
               deals={list.filter((d) => status === "all" || d.status === status)}
               onMove={(id, stageId) => moveMut.mutate({ id, stageId })}
               onOpen={openDeal}
+              columnWidths={colWidths}
+              onColumnWidths={setColWidths}
+              onColumnWidthsCommit={commitWidths}
             />
           </div>
         ) : (
@@ -196,6 +256,11 @@ function PipelinePage() {
                 >
                   <td className="px-4 py-2.5 sm:px-6">
                     {d.title}
+                    {d.eventType && (
+                      <Badge variant="steel" className="ml-2">
+                        {d.eventType}
+                      </Badge>
+                    )}
                     {d.rotting && (
                       <Badge variant="warn" className="ml-2">
                         rotting

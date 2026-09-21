@@ -19,12 +19,15 @@ import { Route as BoardsRouteImport } from './routes/boards'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as BroadcastsRouteImport } from './routes/broadcasts'
 import { Route as ChatbotRouteImport } from './routes/chatbot'
+import { Route as ClientPortalRouteImport } from './routes/client-portal'
+import { Route as ColdRouteImport } from './routes/cold'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ContactsRouteImport } from './routes/contacts'
 import { Route as CrewRouteImport } from './routes/crew'
 import { Route as DevelopersRouteImport } from './routes/developers'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as DomainRouteImport } from './routes/domain'
 import { Route as EsignRouteImport } from './routes/esign'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as FinanceRouteImport } from './routes/finance'
@@ -44,10 +47,13 @@ import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as LeadboosterRouteImport } from './routes/leadbooster'
 import { Route as LeadsRouteImport } from './routes/leads'
+import { Route as LifecycleRouteImport } from './routes/lifecycle'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LookupRouteImport } from './routes/lookup'
 import { Route as MailRouteImport } from './routes/mail'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
+import { Route as PortalRouteImport } from './routes/portal'
+import { Route as PortalDomainRouteImport } from './routes/portal-domain'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProjectsRouteImport } from './routes/projects'
@@ -55,6 +61,7 @@ import { Route as ProposalsRouteImport } from './routes/proposals'
 import { Route as ProspectorRouteImport } from './routes/prospector'
 import { Route as PulseRouteImport } from './routes/pulse'
 import { Route as QuotesRouteImport } from './routes/quotes'
+import { Route as RegistryRouteImport } from './routes/registry'
 import { Route as RequestRouteImport } from './routes/request'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SandboxRouteImport } from './routes/sandbox'
@@ -62,20 +69,28 @@ import { Route as SchedulerRouteImport } from './routes/scheduler'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SequencesRouteImport } from './routes/sequences'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SmsRouteImport } from './routes/sms'
+import { Route as SmtpRouteImport } from './routes/smtp'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as TravelRouteImport } from './routes/travel'
+import { Route as ViewsRouteImport } from './routes/views'
 import { Route as BoardTokenRouteImport } from './routes/board.$token'
 import { Route as BookSlugRouteImport } from './routes/book.$slug'
+import { Route as CTokenRouteImport } from './routes/c.$token'
 import { Route as CalTokenRouteImport } from './routes/cal.$token'
 import { Route as ContactsPersonIdRouteImport } from './routes/contacts.$personId'
 import { Route as DealsDealIdRouteImport } from './routes/deals.$dealId'
 import { Route as EsignEnvelopeIdRouteImport } from './routes/esign.$envelopeId'
 import { Route as FSlugRouteImport } from './routes/f.$slug'
+import { Route as HTokenRouteImport } from './routes/h.$token'
 import { Route as OrgsOrgIdRouteImport } from './routes/orgs.$orgId'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as RTokenRouteImport } from './routes/r.$token'
 import { Route as RsvpTokenRouteImport } from './routes/rsvp.$token'
 import { Route as SignDocIdRouteImport } from './routes/sign.$docId'
+import { Route as TIdRouteImport } from './routes/t.$id'
+import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as WSlugRouteImport } from './routes/w.$slug'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1IndexRouteImport } from './routes/api/v1/index'
@@ -131,6 +146,16 @@ const ChatbotRoute = ChatbotRouteImport.update({
   path: '/chatbot',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientPortalRoute = ClientPortalRouteImport.update({
+  id: '/client-portal',
+  path: '/client-portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ColdRoute = ColdRouteImport.update({
+  id: '/cold',
+  path: '/cold',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
@@ -159,6 +184,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const DocumentsRoute = DocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DomainRoute = DomainRouteImport.update({
+  id: '/domain',
+  path: '/domain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EsignRoute = EsignRouteImport.update({
@@ -256,6 +286,11 @@ const LeadsRoute = LeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LifecycleRoute = LifecycleRouteImport.update({
+  id: '/lifecycle',
+  path: '/lifecycle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -274,6 +309,16 @@ const MailRoute = MailRouteImport.update({
 const MarketplaceRoute = MarketplaceRouteImport.update({
   id: '/marketplace',
   path: '/marketplace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalDomainRoute = PortalDomainRouteImport.update({
+  id: '/portal-domain',
+  path: '/portal-domain',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsRoute = ProductsRouteImport.update({
@@ -311,6 +356,11 @@ const QuotesRoute = QuotesRouteImport.update({
   path: '/quotes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegistryRoute = RegistryRouteImport.update({
+  id: '/registry',
+  path: '/registry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RequestRoute = RequestRouteImport.update({
   id: '/request',
   path: '/request',
@@ -346,6 +396,16 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SmsRoute = SmsRouteImport.update({
+  id: '/sms',
+  path: '/sms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SmtpRoute = SmtpRouteImport.update({
+  id: '/smtp',
+  path: '/smtp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
@@ -356,6 +416,11 @@ const TravelRoute = TravelRouteImport.update({
   path: '/travel',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ViewsRoute = ViewsRouteImport.update({
+  id: '/views',
+  path: '/views',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoardTokenRoute = BoardTokenRouteImport.update({
   id: '/board/$token',
   path: '/board/$token',
@@ -364,6 +429,11 @@ const BoardTokenRoute = BoardTokenRouteImport.update({
 const BookSlugRoute = BookSlugRouteImport.update({
   id: '/book/$slug',
   path: '/book/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CTokenRoute = CTokenRouteImport.update({
+  id: '/c/$token',
+  path: '/c/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CalTokenRoute = CalTokenRouteImport.update({
@@ -391,6 +461,11 @@ const FSlugRoute = FSlugRouteImport.update({
   path: '/f/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HTokenRoute = HTokenRouteImport.update({
+  id: '/h/$token',
+  path: '/h/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrgsOrgIdRoute = OrgsOrgIdRouteImport.update({
   id: '/orgs/$orgId',
   path: '/orgs/$orgId',
@@ -406,6 +481,11 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   path: '/$projectId',
   getParentRoute: () => ProjectsRoute,
 } as any)
+const RTokenRoute = RTokenRouteImport.update({
+  id: '/r/$token',
+  path: '/r/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RsvpTokenRoute = RsvpTokenRouteImport.update({
   id: '/rsvp/$token',
   path: '/rsvp/$token',
@@ -414,6 +494,16 @@ const RsvpTokenRoute = RsvpTokenRouteImport.update({
 const SignDocIdRoute = SignDocIdRouteImport.update({
   id: '/sign/$docId',
   path: '/sign/$docId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TIdRoute = TIdRouteImport.update({
+  id: '/t/$id',
+  path: '/t/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UTokenRoute = UTokenRouteImport.update({
+  id: '/u/$token',
+  path: '/u/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WSlugRoute = WSlugRouteImport.update({
@@ -448,12 +538,15 @@ export interface FileRoutesByFullPath {
   '/bookmarks': typeof BookmarksRoute
   '/broadcasts': typeof BroadcastsRoute
   '/chatbot': typeof ChatbotRoute
+  '/client-portal': typeof ClientPortalRoute
+  '/cold': typeof ColdRoute
   '/contact': typeof ContactRoute
   '/contacts': typeof ContactsRouteWithChildren
   '/crew': typeof CrewRoute
   '/developers': typeof DevelopersRoute
   '/discover': typeof DiscoverRoute
   '/documents': typeof DocumentsRoute
+  '/domain': typeof DomainRoute
   '/esign': typeof EsignRouteWithChildren
   '/files': typeof FilesRoute
   '/finance': typeof FinanceRoute
@@ -473,10 +566,13 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof IntegrationsRoute
   '/leadbooster': typeof LeadboosterRoute
   '/leads': typeof LeadsRoute
+  '/lifecycle': typeof LifecycleRoute
   '/login': typeof LoginRoute
   '/lookup': typeof LookupRoute
   '/mail': typeof MailRoute
   '/marketplace': typeof MarketplaceRoute
+  '/portal': typeof PortalRoute
+  '/portal-domain': typeof PortalDomainRoute
   '/products': typeof ProductsRoute
   '/profile': typeof ProfileRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -484,6 +580,7 @@ export interface FileRoutesByFullPath {
   '/prospector': typeof ProspectorRoute
   '/pulse': typeof PulseRoute
   '/quotes': typeof QuotesRoute
+  '/registry': typeof RegistryRoute
   '/request': typeof RequestRoute
   '/reviews': typeof ReviewsRoute
   '/sandbox': typeof SandboxRoute
@@ -491,20 +588,28 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/sequences': typeof SequencesRoute
   '/settings': typeof SettingsRoute
+  '/sms': typeof SmsRoute
+  '/smtp': typeof SmtpRoute
   '/tasks': typeof TasksRoute
   '/travel': typeof TravelRoute
+  '/views': typeof ViewsRoute
   '/board/$token': typeof BoardTokenRoute
   '/book/$slug': typeof BookSlugRoute
+  '/c/$token': typeof CTokenRoute
   '/cal/$token': typeof CalTokenRoute
   '/contacts/$personId': typeof ContactsPersonIdRoute
   '/deals/$dealId': typeof DealsDealIdRoute
   '/esign/$envelopeId': typeof EsignEnvelopeIdRoute
   '/f/$slug': typeof FSlugRoute
+  '/h/$token': typeof HTokenRoute
   '/orgs/$orgId': typeof OrgsOrgIdRoute
   '/p/$token': typeof PTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/r/$token': typeof RTokenRoute
   '/rsvp/$token': typeof RsvpTokenRoute
   '/sign/$docId': typeof SignDocIdRoute
+  '/t/$id': typeof TIdRoute
+  '/u/$token': typeof UTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -521,12 +626,15 @@ export interface FileRoutesByTo {
   '/bookmarks': typeof BookmarksRoute
   '/broadcasts': typeof BroadcastsRoute
   '/chatbot': typeof ChatbotRoute
+  '/client-portal': typeof ClientPortalRoute
+  '/cold': typeof ColdRoute
   '/contact': typeof ContactRoute
   '/contacts': typeof ContactsRouteWithChildren
   '/crew': typeof CrewRoute
   '/developers': typeof DevelopersRoute
   '/discover': typeof DiscoverRoute
   '/documents': typeof DocumentsRoute
+  '/domain': typeof DomainRoute
   '/esign': typeof EsignRouteWithChildren
   '/files': typeof FilesRoute
   '/finance': typeof FinanceRoute
@@ -546,10 +654,13 @@ export interface FileRoutesByTo {
   '/integrations': typeof IntegrationsRoute
   '/leadbooster': typeof LeadboosterRoute
   '/leads': typeof LeadsRoute
+  '/lifecycle': typeof LifecycleRoute
   '/login': typeof LoginRoute
   '/lookup': typeof LookupRoute
   '/mail': typeof MailRoute
   '/marketplace': typeof MarketplaceRoute
+  '/portal': typeof PortalRoute
+  '/portal-domain': typeof PortalDomainRoute
   '/products': typeof ProductsRoute
   '/profile': typeof ProfileRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -557,6 +668,7 @@ export interface FileRoutesByTo {
   '/prospector': typeof ProspectorRoute
   '/pulse': typeof PulseRoute
   '/quotes': typeof QuotesRoute
+  '/registry': typeof RegistryRoute
   '/request': typeof RequestRoute
   '/reviews': typeof ReviewsRoute
   '/sandbox': typeof SandboxRoute
@@ -564,20 +676,28 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/sequences': typeof SequencesRoute
   '/settings': typeof SettingsRoute
+  '/sms': typeof SmsRoute
+  '/smtp': typeof SmtpRoute
   '/tasks': typeof TasksRoute
   '/travel': typeof TravelRoute
+  '/views': typeof ViewsRoute
   '/board/$token': typeof BoardTokenRoute
   '/book/$slug': typeof BookSlugRoute
+  '/c/$token': typeof CTokenRoute
   '/cal/$token': typeof CalTokenRoute
   '/contacts/$personId': typeof ContactsPersonIdRoute
   '/deals/$dealId': typeof DealsDealIdRoute
   '/esign/$envelopeId': typeof EsignEnvelopeIdRoute
   '/f/$slug': typeof FSlugRoute
+  '/h/$token': typeof HTokenRoute
   '/orgs/$orgId': typeof OrgsOrgIdRoute
   '/p/$token': typeof PTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/r/$token': typeof RTokenRoute
   '/rsvp/$token': typeof RsvpTokenRoute
   '/sign/$docId': typeof SignDocIdRoute
+  '/t/$id': typeof TIdRoute
+  '/u/$token': typeof UTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -595,12 +715,15 @@ export interface FileRoutesById {
   '/bookmarks': typeof BookmarksRoute
   '/broadcasts': typeof BroadcastsRoute
   '/chatbot': typeof ChatbotRoute
+  '/client-portal': typeof ClientPortalRoute
+  '/cold': typeof ColdRoute
   '/contact': typeof ContactRoute
   '/contacts': typeof ContactsRouteWithChildren
   '/crew': typeof CrewRoute
   '/developers': typeof DevelopersRoute
   '/discover': typeof DiscoverRoute
   '/documents': typeof DocumentsRoute
+  '/domain': typeof DomainRoute
   '/esign': typeof EsignRouteWithChildren
   '/files': typeof FilesRoute
   '/finance': typeof FinanceRoute
@@ -620,10 +743,13 @@ export interface FileRoutesById {
   '/integrations': typeof IntegrationsRoute
   '/leadbooster': typeof LeadboosterRoute
   '/leads': typeof LeadsRoute
+  '/lifecycle': typeof LifecycleRoute
   '/login': typeof LoginRoute
   '/lookup': typeof LookupRoute
   '/mail': typeof MailRoute
   '/marketplace': typeof MarketplaceRoute
+  '/portal': typeof PortalRoute
+  '/portal-domain': typeof PortalDomainRoute
   '/products': typeof ProductsRoute
   '/profile': typeof ProfileRoute
   '/projects': typeof ProjectsRouteWithChildren
@@ -631,6 +757,7 @@ export interface FileRoutesById {
   '/prospector': typeof ProspectorRoute
   '/pulse': typeof PulseRoute
   '/quotes': typeof QuotesRoute
+  '/registry': typeof RegistryRoute
   '/request': typeof RequestRoute
   '/reviews': typeof ReviewsRoute
   '/sandbox': typeof SandboxRoute
@@ -638,20 +765,28 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/sequences': typeof SequencesRoute
   '/settings': typeof SettingsRoute
+  '/sms': typeof SmsRoute
+  '/smtp': typeof SmtpRoute
   '/tasks': typeof TasksRoute
   '/travel': typeof TravelRoute
+  '/views': typeof ViewsRoute
   '/board/$token': typeof BoardTokenRoute
   '/book/$slug': typeof BookSlugRoute
+  '/c/$token': typeof CTokenRoute
   '/cal/$token': typeof CalTokenRoute
   '/contacts/$personId': typeof ContactsPersonIdRoute
   '/deals/$dealId': typeof DealsDealIdRoute
   '/esign/$envelopeId': typeof EsignEnvelopeIdRoute
   '/f/$slug': typeof FSlugRoute
+  '/h/$token': typeof HTokenRoute
   '/orgs/$orgId': typeof OrgsOrgIdRoute
   '/p/$token': typeof PTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
+  '/r/$token': typeof RTokenRoute
   '/rsvp/$token': typeof RsvpTokenRoute
   '/sign/$docId': typeof SignDocIdRoute
+  '/t/$id': typeof TIdRoute
+  '/u/$token': typeof UTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -670,12 +805,15 @@ export interface FileRouteTypes {
     | '/bookmarks'
     | '/broadcasts'
     | '/chatbot'
+    | '/client-portal'
+    | '/cold'
     | '/contact'
     | '/contacts'
     | '/crew'
     | '/developers'
     | '/discover'
     | '/documents'
+    | '/domain'
     | '/esign'
     | '/files'
     | '/finance'
@@ -695,10 +833,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/leadbooster'
     | '/leads'
+    | '/lifecycle'
     | '/login'
     | '/lookup'
     | '/mail'
     | '/marketplace'
+    | '/portal'
+    | '/portal-domain'
     | '/products'
     | '/profile'
     | '/projects'
@@ -706,6 +847,7 @@ export interface FileRouteTypes {
     | '/prospector'
     | '/pulse'
     | '/quotes'
+    | '/registry'
     | '/request'
     | '/reviews'
     | '/sandbox'
@@ -713,20 +855,28 @@ export interface FileRouteTypes {
     | '/security'
     | '/sequences'
     | '/settings'
+    | '/sms'
+    | '/smtp'
     | '/tasks'
     | '/travel'
+    | '/views'
     | '/board/$token'
     | '/book/$slug'
+    | '/c/$token'
     | '/cal/$token'
     | '/contacts/$personId'
     | '/deals/$dealId'
     | '/esign/$envelopeId'
     | '/f/$slug'
+    | '/h/$token'
     | '/orgs/$orgId'
     | '/p/$token'
     | '/projects/$projectId'
+    | '/r/$token'
     | '/rsvp/$token'
     | '/sign/$docId'
+    | '/t/$id'
+    | '/u/$token'
     | '/w/$slug'
     | '/api/auth/$'
     | '/api/v1/$'
@@ -743,12 +893,15 @@ export interface FileRouteTypes {
     | '/bookmarks'
     | '/broadcasts'
     | '/chatbot'
+    | '/client-portal'
+    | '/cold'
     | '/contact'
     | '/contacts'
     | '/crew'
     | '/developers'
     | '/discover'
     | '/documents'
+    | '/domain'
     | '/esign'
     | '/files'
     | '/finance'
@@ -768,10 +921,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/leadbooster'
     | '/leads'
+    | '/lifecycle'
     | '/login'
     | '/lookup'
     | '/mail'
     | '/marketplace'
+    | '/portal'
+    | '/portal-domain'
     | '/products'
     | '/profile'
     | '/projects'
@@ -779,6 +935,7 @@ export interface FileRouteTypes {
     | '/prospector'
     | '/pulse'
     | '/quotes'
+    | '/registry'
     | '/request'
     | '/reviews'
     | '/sandbox'
@@ -786,20 +943,28 @@ export interface FileRouteTypes {
     | '/security'
     | '/sequences'
     | '/settings'
+    | '/sms'
+    | '/smtp'
     | '/tasks'
     | '/travel'
+    | '/views'
     | '/board/$token'
     | '/book/$slug'
+    | '/c/$token'
     | '/cal/$token'
     | '/contacts/$personId'
     | '/deals/$dealId'
     | '/esign/$envelopeId'
     | '/f/$slug'
+    | '/h/$token'
     | '/orgs/$orgId'
     | '/p/$token'
     | '/projects/$projectId'
+    | '/r/$token'
     | '/rsvp/$token'
     | '/sign/$docId'
+    | '/t/$id'
+    | '/u/$token'
     | '/w/$slug'
     | '/api/auth/$'
     | '/api/v1/$'
@@ -816,12 +981,15 @@ export interface FileRouteTypes {
     | '/bookmarks'
     | '/broadcasts'
     | '/chatbot'
+    | '/client-portal'
+    | '/cold'
     | '/contact'
     | '/contacts'
     | '/crew'
     | '/developers'
     | '/discover'
     | '/documents'
+    | '/domain'
     | '/esign'
     | '/files'
     | '/finance'
@@ -841,10 +1009,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/leadbooster'
     | '/leads'
+    | '/lifecycle'
     | '/login'
     | '/lookup'
     | '/mail'
     | '/marketplace'
+    | '/portal'
+    | '/portal-domain'
     | '/products'
     | '/profile'
     | '/projects'
@@ -852,6 +1023,7 @@ export interface FileRouteTypes {
     | '/prospector'
     | '/pulse'
     | '/quotes'
+    | '/registry'
     | '/request'
     | '/reviews'
     | '/sandbox'
@@ -859,20 +1031,28 @@ export interface FileRouteTypes {
     | '/security'
     | '/sequences'
     | '/settings'
+    | '/sms'
+    | '/smtp'
     | '/tasks'
     | '/travel'
+    | '/views'
     | '/board/$token'
     | '/book/$slug'
+    | '/c/$token'
     | '/cal/$token'
     | '/contacts/$personId'
     | '/deals/$dealId'
     | '/esign/$envelopeId'
     | '/f/$slug'
+    | '/h/$token'
     | '/orgs/$orgId'
     | '/p/$token'
     | '/projects/$projectId'
+    | '/r/$token'
     | '/rsvp/$token'
     | '/sign/$docId'
+    | '/t/$id'
+    | '/u/$token'
     | '/w/$slug'
     | '/api/auth/$'
     | '/api/v1/$'
@@ -890,12 +1070,15 @@ export interface RootRouteChildren {
   BookmarksRoute: typeof BookmarksRoute
   BroadcastsRoute: typeof BroadcastsRoute
   ChatbotRoute: typeof ChatbotRoute
+  ClientPortalRoute: typeof ClientPortalRoute
+  ColdRoute: typeof ColdRoute
   ContactRoute: typeof ContactRoute
   ContactsRoute: typeof ContactsRouteWithChildren
   CrewRoute: typeof CrewRoute
   DevelopersRoute: typeof DevelopersRoute
   DiscoverRoute: typeof DiscoverRoute
   DocumentsRoute: typeof DocumentsRoute
+  DomainRoute: typeof DomainRoute
   EsignRoute: typeof EsignRouteWithChildren
   FilesRoute: typeof FilesRoute
   FinanceRoute: typeof FinanceRoute
@@ -915,10 +1098,13 @@ export interface RootRouteChildren {
   IntegrationsRoute: typeof IntegrationsRoute
   LeadboosterRoute: typeof LeadboosterRoute
   LeadsRoute: typeof LeadsRoute
+  LifecycleRoute: typeof LifecycleRoute
   LoginRoute: typeof LoginRoute
   LookupRoute: typeof LookupRoute
   MailRoute: typeof MailRoute
   MarketplaceRoute: typeof MarketplaceRoute
+  PortalRoute: typeof PortalRoute
+  PortalDomainRoute: typeof PortalDomainRoute
   ProductsRoute: typeof ProductsRoute
   ProfileRoute: typeof ProfileRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
@@ -926,6 +1112,7 @@ export interface RootRouteChildren {
   ProspectorRoute: typeof ProspectorRoute
   PulseRoute: typeof PulseRoute
   QuotesRoute: typeof QuotesRoute
+  RegistryRoute: typeof RegistryRoute
   RequestRoute: typeof RequestRoute
   ReviewsRoute: typeof ReviewsRoute
   SandboxRoute: typeof SandboxRoute
@@ -933,17 +1120,25 @@ export interface RootRouteChildren {
   SecurityRoute: typeof SecurityRoute
   SequencesRoute: typeof SequencesRoute
   SettingsRoute: typeof SettingsRoute
+  SmsRoute: typeof SmsRoute
+  SmtpRoute: typeof SmtpRoute
   TasksRoute: typeof TasksRoute
   TravelRoute: typeof TravelRoute
+  ViewsRoute: typeof ViewsRoute
   BoardTokenRoute: typeof BoardTokenRoute
   BookSlugRoute: typeof BookSlugRoute
+  CTokenRoute: typeof CTokenRoute
   CalTokenRoute: typeof CalTokenRoute
   DealsDealIdRoute: typeof DealsDealIdRoute
   FSlugRoute: typeof FSlugRoute
+  HTokenRoute: typeof HTokenRoute
   OrgsOrgIdRoute: typeof OrgsOrgIdRoute
   PTokenRoute: typeof PTokenRoute
+  RTokenRoute: typeof RTokenRoute
   RsvpTokenRoute: typeof RsvpTokenRoute
   SignDocIdRoute: typeof SignDocIdRoute
+  TIdRoute: typeof TIdRoute
+  UTokenRoute: typeof UTokenRoute
   WSlugRoute: typeof WSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
@@ -1022,6 +1217,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatbotRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/client-portal': {
+      id: '/client-portal'
+      path: '/client-portal'
+      fullPath: '/client-portal'
+      preLoaderRoute: typeof ClientPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cold': {
+      id: '/cold'
+      path: '/cold'
+      fullPath: '/cold'
+      preLoaderRoute: typeof ColdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -1062,6 +1271,13 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/domain': {
+      id: '/domain'
+      path: '/domain'
+      fullPath: '/domain'
+      preLoaderRoute: typeof DomainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/esign': {
@@ -1197,6 +1413,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lifecycle': {
+      id: '/lifecycle'
+      path: '/lifecycle'
+      fullPath: '/lifecycle'
+      preLoaderRoute: typeof LifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -1223,6 +1446,20 @@ declare module '@tanstack/react-router' {
       path: '/marketplace'
       fullPath: '/marketplace'
       preLoaderRoute: typeof MarketplaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal-domain': {
+      id: '/portal-domain'
+      path: '/portal-domain'
+      fullPath: '/portal-domain'
+      preLoaderRoute: typeof PortalDomainRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -1274,6 +1511,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QuotesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/registry': {
+      id: '/registry'
+      path: '/registry'
+      fullPath: '/registry'
+      preLoaderRoute: typeof RegistryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/request': {
       id: '/request'
       path: '/request'
@@ -1323,6 +1567,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sms': {
+      id: '/sms'
+      path: '/sms'
+      fullPath: '/sms'
+      preLoaderRoute: typeof SmsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/smtp': {
+      id: '/smtp'
+      path: '/smtp'
+      fullPath: '/smtp'
+      preLoaderRoute: typeof SmtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tasks': {
       id: '/tasks'
       path: '/tasks'
@@ -1337,6 +1595,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TravelRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/views': {
+      id: '/views'
+      path: '/views'
+      fullPath: '/views'
+      preLoaderRoute: typeof ViewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/board/$token': {
       id: '/board/$token'
       path: '/board/$token'
@@ -1349,6 +1614,13 @@ declare module '@tanstack/react-router' {
       path: '/book/$slug'
       fullPath: '/book/$slug'
       preLoaderRoute: typeof BookSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$token': {
+      id: '/c/$token'
+      path: '/c/$token'
+      fullPath: '/c/$token'
+      preLoaderRoute: typeof CTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cal/$token': {
@@ -1386,6 +1658,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/h/$token': {
+      id: '/h/$token'
+      path: '/h/$token'
+      fullPath: '/h/$token'
+      preLoaderRoute: typeof HTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orgs/$orgId': {
       id: '/orgs/$orgId'
       path: '/orgs/$orgId'
@@ -1407,6 +1686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof ProjectsRoute
     }
+    '/r/$token': {
+      id: '/r/$token'
+      path: '/r/$token'
+      fullPath: '/r/$token'
+      preLoaderRoute: typeof RTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rsvp/$token': {
       id: '/rsvp/$token'
       path: '/rsvp/$token'
@@ -1419,6 +1705,20 @@ declare module '@tanstack/react-router' {
       path: '/sign/$docId'
       fullPath: '/sign/$docId'
       preLoaderRoute: typeof SignDocIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$id': {
+      id: '/t/$id'
+      path: '/t/$id'
+      fullPath: '/t/$id'
+      preLoaderRoute: typeof TIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$token': {
+      id: '/u/$token'
+      path: '/u/$token'
+      fullPath: '/u/$token'
+      preLoaderRoute: typeof UTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/w/$slug': {
@@ -1497,12 +1797,15 @@ const rootRouteChildren: RootRouteChildren = {
   BookmarksRoute: BookmarksRoute,
   BroadcastsRoute: BroadcastsRoute,
   ChatbotRoute: ChatbotRoute,
+  ClientPortalRoute: ClientPortalRoute,
+  ColdRoute: ColdRoute,
   ContactRoute: ContactRoute,
   ContactsRoute: ContactsRouteWithChildren,
   CrewRoute: CrewRoute,
   DevelopersRoute: DevelopersRoute,
   DiscoverRoute: DiscoverRoute,
   DocumentsRoute: DocumentsRoute,
+  DomainRoute: DomainRoute,
   EsignRoute: EsignRouteWithChildren,
   FilesRoute: FilesRoute,
   FinanceRoute: FinanceRoute,
@@ -1522,10 +1825,13 @@ const rootRouteChildren: RootRouteChildren = {
   IntegrationsRoute: IntegrationsRoute,
   LeadboosterRoute: LeadboosterRoute,
   LeadsRoute: LeadsRoute,
+  LifecycleRoute: LifecycleRoute,
   LoginRoute: LoginRoute,
   LookupRoute: LookupRoute,
   MailRoute: MailRoute,
   MarketplaceRoute: MarketplaceRoute,
+  PortalRoute: PortalRoute,
+  PortalDomainRoute: PortalDomainRoute,
   ProductsRoute: ProductsRoute,
   ProfileRoute: ProfileRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
@@ -1533,6 +1839,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProspectorRoute: ProspectorRoute,
   PulseRoute: PulseRoute,
   QuotesRoute: QuotesRoute,
+  RegistryRoute: RegistryRoute,
   RequestRoute: RequestRoute,
   ReviewsRoute: ReviewsRoute,
   SandboxRoute: SandboxRoute,
@@ -1540,17 +1847,25 @@ const rootRouteChildren: RootRouteChildren = {
   SecurityRoute: SecurityRoute,
   SequencesRoute: SequencesRoute,
   SettingsRoute: SettingsRoute,
+  SmsRoute: SmsRoute,
+  SmtpRoute: SmtpRoute,
   TasksRoute: TasksRoute,
   TravelRoute: TravelRoute,
+  ViewsRoute: ViewsRoute,
   BoardTokenRoute: BoardTokenRoute,
   BookSlugRoute: BookSlugRoute,
+  CTokenRoute: CTokenRoute,
   CalTokenRoute: CalTokenRoute,
   DealsDealIdRoute: DealsDealIdRoute,
   FSlugRoute: FSlugRoute,
+  HTokenRoute: HTokenRoute,
   OrgsOrgIdRoute: OrgsOrgIdRoute,
   PTokenRoute: PTokenRoute,
+  RTokenRoute: RTokenRoute,
   RsvpTokenRoute: RsvpTokenRoute,
   SignDocIdRoute: SignDocIdRoute,
+  TIdRoute: TIdRoute,
+  UTokenRoute: UTokenRoute,
   WSlugRoute: WSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,

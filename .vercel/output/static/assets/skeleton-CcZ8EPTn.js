@@ -1,0 +1,1 @@
+import{r as e}from"./preload-helper-BF-5aA19.js";import{t}from"./utils-CFDj2cR8.js";var n=e();function r({className:e}){return(0,n.jsx)(`div`,{className:t(`animate-pulse rounded-md bg-accent`,e)})}export{r as t};

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getBootstrap, listEmails, listTemplates, sendEmail } from "@/lib/crm/server";
+import { getActiveSender } from "@/lib/crm/domain";
 import { listBroadcasts, sendBroadcast } from "@/lib/crm/governance";
 import { runAi } from "@/lib/crm/ai";
 import { useUi } from "@/lib/crm/store";
@@ -25,6 +26,11 @@ function MailPage() {
   const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
   const { memberId } = useUi();
   const me = boot.data?.members.find((m) => m.id === memberId);
+  const sender = useQuery({
+    queryKey: ["active-sender", memberId, me?.email],
+    queryFn: () => getActiveSender({ data: { purpose: "compose", memberId, hintAddr: me?.email, fallbackName: me?.name } }),
+    enabled: Boolean(me),
+  });
   const qc = useQueryClient();
   const [openId, setOpenId] = useState<number | null>(null);
   const selected = emails.data?.find((e) => e.id === openId) ?? emails.data?.[0];
@@ -48,7 +54,7 @@ function MailPage() {
     <div className="flex h-[calc(100dvh-3.5rem)] flex-col">
       <PageHeader
         title="Mail"
-        subtitle="Two-way sync, templates, tracking, and group email. 10 shared inboxes on Ultimate."
+        subtitle="Two-way sync, templates, tracking, and group email — from your authenticated domain, not a platform address."
       />
       <div className="flex min-h-0 flex-1 flex-col border-t border-border lg:flex-row">
         <aside className="w-full shrink-0 border-b border-border lg:w-80 lg:border-r lg:border-b-0">
@@ -85,6 +91,7 @@ function MailPage() {
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {e.fromName} · {formatDateTime(e.sentAt ?? e.createdAt)}
+                    {e.authenticated ? " · aligned" : ""}
                   </p>
                 </button>
               </li>
@@ -97,6 +104,7 @@ function MailPage() {
               <h2 className="text-base font-semibold">{selected.subject}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 {`${selected.fromName} <${selected.fromAddr}> → ${selected.toAddr}`}
+                {selected.authenticated ? " · authenticated" : ""}
                 {selected.clicked ? " · clicked" : selected.opened ? " · opened" : ""}
               </p>
               <p className="mt-4 text-sm leading-relaxed">{selected.body}</p>
@@ -142,6 +150,11 @@ function MailPage() {
               ))}
             </div>
             <Textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
+            {sender.data?.authenticated && (
+              <p className="text-xs text-muted-foreground">
+                Sending as {sender.data.fromName} · {sender.data.fromAddr} · SPF / DKIM / DMARC aligned
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 variant="secondary"
@@ -155,9 +168,10 @@ function MailPage() {
                       subject: subject || "(no subject)",
                       body,
                       folder: "drafts",
+                      memberId: me.id,
                     },
-                  }).then(() => {
-                    toast.success("Saved draft");
+                  }).then((r) => {
+                    toast.success(r.authenticated ? `Draft as ${r.fromAddr}` : "Saved draft");
                     qc.invalidateQueries({ queryKey: ["emails"] });
                   });
                 }}
@@ -180,7 +194,7 @@ function MailPage() {
                     }).then((r) => {
                       if (!r.ok) toast.error(r.error ?? "Blocked");
                       else {
-                        toast.success(`Sent to ${r.sent} contacts · tracking on`);
+                        toast.success(`Sent to ${r.sent} · ${r.suppressed ?? 0} suppressed · CAN-SPAM footer attached`);
                         setBody("");
                         qc.invalidateQueries({ queryKey: ["broadcasts"] });
                         qc.invalidateQueries({ queryKey: ["emails"] });
@@ -196,9 +210,10 @@ function MailPage() {
                       toAddr: to || "client@example.com",
                       subject: subject || "(no subject)",
                       body,
+                      memberId: me.id,
                     },
-                  }).then(() => {
-                    toast.success("Sent · tracking on");
+                  }).then((r) => {
+                    toast.success(r.authenticated ? `Sent from ${r.fromAddr}` : "Sent · tracking on");
                     setBody("");
                     qc.invalidateQueries({ queryKey: ["emails"] });
                   });

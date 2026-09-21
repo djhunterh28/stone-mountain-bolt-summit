@@ -5,6 +5,7 @@ import { iso, money } from "@/lib/utils";
 import { consumeCredit } from "./governance";
 import { DEAL_SELECT, mapActivity, mapDeal, mapOrg, mapPerson } from "./map";
 import { hashSha } from "@/lib/portal/access";
+import { insertOutbound } from "./domain";
 import type { ChatbotFlow, Goal, SequenceEnrollment } from "./types";
 
 const NYC: Record<string, { lat: number; lng: number; employees: string; revenue: string }> = {
@@ -242,8 +243,8 @@ export const cloneDeal = createServerFn({ method: "POST" })
     const sql = await getSql();
     const d = (await sql`select * from deals where id = ${data.id}`)[0];
     if (!d) return { id: null as number | null };
-    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, org_id, person_id, owner_id, status, expected_close, probability, source, event_date, venue, guest_count, indoor, load_in, notes)
-      values (${`Copy of ${String(d.title)}`}, ${money(d.value)}, ${Number(d.pipeline_id)}, ${Number(d.stage_id)}, ${d.org_id == null ? null : Number(d.org_id)}, ${d.person_id == null ? null : Number(d.person_id)}, ${d.owner_id == null ? null : Number(d.owner_id)}, ${"open"}, ${d.expected_close == null ? null : String(d.expected_close)}, ${Number(d.probability ?? 0)}, ${d.source == null ? null : String(d.source)}, ${d.event_date == null ? null : String(d.event_date)}, ${d.venue == null ? null : String(d.venue)}, ${d.guest_count == null ? null : Number(d.guest_count)}, ${d.indoor}, ${d.load_in == null ? null : String(d.load_in)}, ${d.notes == null ? null : String(d.notes)})
+    const rows = await sql`insert into deals (title, value, pipeline_id, stage_id, org_id, person_id, owner_id, status, expected_close, probability, source, event_date, venue, guest_count, indoor, load_in, notes, event_type)
+      values (${`Copy of ${String(d.title)}`}, ${money(d.value)}, ${Number(d.pipeline_id)}, ${Number(d.stage_id)}, ${d.org_id == null ? null : Number(d.org_id)}, ${d.person_id == null ? null : Number(d.person_id)}, ${d.owner_id == null ? null : Number(d.owner_id)}, ${"open"}, ${d.expected_close == null ? null : String(d.expected_close)}, ${Number(d.probability ?? 0)}, ${d.source == null ? null : String(d.source)}, ${d.event_date == null ? null : String(d.event_date)}, ${d.venue == null ? null : String(d.venue)}, ${d.guest_count == null ? null : Number(d.guest_count)}, ${d.indoor}, ${d.load_in == null ? null : String(d.load_in)}, ${d.notes == null ? null : String(d.notes)}, ${d.event_type == null ? null : String(d.event_type)})
       returning id`;
     const id = Number(rows[0]!.id);
     const products = await sql`select * from deal_products where deal_id = ${data.id}`;
@@ -457,6 +458,29 @@ export const enrollSequence = createServerFn({ method: "POST" })
     const sql = await getSql();
     await sql`insert into sequence_enrollments (sequence_id, person_id) values (${data.sequenceId}, ${data.personId})`;
     await sql`update sequences set enrolled = enrolled + 1 where id = ${data.sequenceId}`;
+    const seq = (await sql.query(`select * from sequences where id = $1`, [data.sequenceId]))[0];
+    const person = (await sql.query(`select * from people where id = $1`, [data.personId]))[0];
+    if (seq && person?.email) {
+      let steps: { day?: number; channel?: string; title?: string }[] = [];
+      try {
+        steps = typeof seq.steps === "string" ? JSON.parse(String(seq.steps)) : ((seq.steps as typeof steps) ?? []);
+      } catch {
+        steps = [];
+      }
+      const first = steps.find((s) => s.channel === "email") ?? steps[0];
+      if (first) {
+        const firstName = String(person.name).split(" ")[0] ?? "there";
+        await insertOutbound(sql, {
+          purpose: "workflow",
+          toAddr: String(person.email),
+          subject: String(first.title ?? seq.name),
+          body: `Hi ${firstName} —\n\n${first.title ?? "Following up from Northline."}\n\nThis cadence left hurricaneproductionsllc.com, not a platform address.\n\n— Northline Shows`,
+          personId: data.personId,
+          fallbackName: "Northline Shows",
+          hintAddr: "shows@hurricaneproductionsllc.com",
+        });
+      }
+    }
     return { ok: true };
   });
 
@@ -471,6 +495,37 @@ export const runAutomation = createServerFn({ method: "POST" })
     if (String(a.action_type) === "activity.create") {
       await sql`insert into activities (type, subject, owner_id, due_at, notes)
         values (${"task"}, ${String(a.action_detail ?? "Automation task")}, ${1}, now() + interval '1 day', ${"Fired from " + String(a.name)})`;
+    }
+    if (String(a.action_type) === "email.template") {
+      const tpl = (
+        await sql.query(
+          `select * from email_templates where name ilike '%' || $1 || '%' or $1 ilike '%' || name || '%' order by id limit 1`,
+          [String(a.action_detail ?? "COI")],
+        )
+      )[0] ?? (await sql.query(`select * from email_templates order by id limit 1`))[0];
+      const person = (
+        await sql.query(
+          `select p.email, p.name, d.id as deal_id from deals d join people p on p.id = d.person_id
+           where d.status = 'open' and p.email is not null order by d.id limit 1`,
+        )
+      )[0];
+      if (tpl && person) {
+        const first = String(person.name).split(" ")[0] ?? "there";
+        const body = String(tpl.body)
+          .replaceAll("{{first_name}}", first)
+          .replaceAll("{{venue}}", "the venue")
+          .replaceAll("{{deal}}", String(a.name));
+        await insertOutbound(sql, {
+          purpose: "workflow",
+          mailKind: "transactional",
+          toAddr: String(person.email),
+          subject: String(tpl.subject).replaceAll("{{first_name}}", first).replaceAll("{{deal}}", String(a.name)).replaceAll("{{venue}}", "the venue"),
+          body,
+          dealId: Number(person.deal_id),
+          fallbackName: "Northline Shows",
+          hintAddr: "shows@hurricaneproductionsllc.com",
+        });
+      }
     }
     return { ok: true, action: String(a.action_type) };
   });

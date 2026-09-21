@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:8080/",
+  "url": "http://127.0.0.1:8080/board/nlb_gowanus8k2m",
   "viewports": {
     "desktop": {
       "width": 1280,
@@ -7,9 +7,9 @@
       "status": 200,
       "title": "Northline",
       "hasCanvas": false,
-      "bodyTextLen": 728,
-      "bodyTextHash": "45af62eeccae01822592e85917f1cc0d15c4be49e2ef45a1ba42a0befca18e42",
-      "bodyTextPrefix": "Northline REGISTERED ACCESS The house CRM for live event product",
+      "bodyTextLen": 919,
+      "bodyTextHash": "997d7a9fe7ee888f93811ed17e86d6551796ef0050a24674bdb0240a05c1b6e5",
+      "bodyTextPrefix": "NORTHLINE · DISPLAY Gowanus shop Warehouse floor 16:34:15 MON, S",
       "horizontalOverflow": false,
       "consoleErrors": [],
       "pageErrors": [],
@@ -21,9 +21,9 @@
       "status": 200,
       "title": "Northline",
       "hasCanvas": false,
-      "bodyTextLen": 18,
-      "bodyTextHash": "18403a919f05983e105534050645325da0f96559b552d36c0b1d1b2d7a6617c9",
-      "bodyTextPrefix": "Loading the house…",
+      "bodyTextLen": 17,
+      "bodyTextHash": "c51abef46131630cb3572937ece69855063ae514efaedea78debb09d911c8773",
+      "bodyTextPrefix": "OPENING THE BOARD",
       "horizontalOverflow": false,
       "consoleErrors": [],
       "pageErrors": [],

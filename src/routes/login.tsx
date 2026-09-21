@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -7,18 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { checkEmailGate, issueOtp, verifyOtp } from "@/lib/portal/server";
+import { getPortalBrand } from "@/lib/portal/brand";
+import { HurricaneLogo } from "@/components/portal/hp-mark";
 
 export const Route = createFileRoute("/login")({ component: Login });
-
-function Mark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden>
-      <rect x="4" y="5" width="3.2" height="14" rx="0.6" fill="currentColor" opacity="0.95" />
-      <rect x="9.4" y="8" width="3.2" height="11" rx="0.6" fill="currentColor" opacity="0.7" />
-      <rect x="14.8" y="3" width="3.2" height="16" rx="0.6" fill="currentColor" />
-    </svg>
-  );
-}
 
 function GoogleMark() {
   return (
@@ -60,6 +53,12 @@ function XMark() {
 
 function Login() {
   const { user, isPending } = useCurrentUserState();
+  const portalMode =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(window.location.search).get("portal") === "1" ||
+      window.location.hostname.startsWith("portal."));
+  const brand = useQuery({ queryKey: ["portal-brand"], queryFn: () => getPortalBrand(), enabled: portalMode });
+  const b = brand.data;
   const [mode, setMode] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -143,20 +142,30 @@ function Login() {
   return (
     <main className="grid min-h-dvh bg-background lg:grid-cols-[1.05fr_0.95fr]">
       <aside className="relative hidden overflow-hidden border-r border-border bg-sidebar px-12 py-12 lg:flex lg:flex-col">
-        <div className="flex items-center gap-2.5 text-primary">
-          <Mark className="size-7" />
-          <span className="text-sm font-semibold tracking-tight text-foreground">Northline</span>
+        <div className="flex items-center gap-2.5">
+          {portalMode ? (
+            <>
+              <HurricaneLogo className="size-9" />
+              <span className="text-sm font-semibold tracking-tight text-foreground">{b?.company ?? "Hurricane Productions"}</span>
+            </>
+          ) : (
+            <>
+              <HurricaneLogo className="size-9" />
+              <span className="text-sm font-semibold tracking-tight text-foreground">Hurricane</span>
+            </>
+          )}
         </div>
         <div className="relative z-10 mt-auto max-w-md pb-8">
           <p className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-            Registered access
+            {portalMode ? "Client portal" : "Registered access"}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-balance">
-            The house CRM for live event production.
+            {portalMode ? (b?.tagline ?? "Stop Quoting. Start Partnering.") : "The house CRM for live event production."}
           </h1>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Pipeline, labor, and show files stay behind a signed-in session. Public
-            booking, web forms, and e-sign links remain open for clients.
+            {portalMode
+              ? `Your files, approvals, and signatures on ${b?.portalHost ?? "portal.hurricaneproductionsllc.com"}. Not a vendor subdomain.`
+              : "Pipeline, labor, and show files stay behind a signed-in session. Public booking, web forms, and e-sign links remain open for clients."}
           </p>
           <ul className="mt-8 grid gap-2 text-sm text-muted-foreground">
             {["Encrypted workspace session", "Google, X, or company email", "Idle lock still sits on top of sign-in"].map(
@@ -169,14 +178,23 @@ function Login() {
             )}
           </ul>
         </div>
-        <Mark className="pointer-events-none absolute -right-10 -bottom-8 size-72 text-foreground/6" />
+        <HurricaneLogo className="pointer-events-none absolute -right-8 -bottom-8 size-72 opacity-10" alt="" />
       </aside>
 
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 text-primary lg:hidden">
-            <Mark className="size-6" />
-            <span className="text-sm font-semibold text-foreground">Northline</span>
+          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
+            {portalMode ? (
+              <>
+                <HurricaneLogo className="size-8" />
+                <span className="text-sm font-semibold text-foreground">{b?.company ?? "Hurricane Productions"}</span>
+              </>
+            ) : (
+              <>
+                <HurricaneLogo className="size-8" />
+                <span className="text-sm font-semibold text-foreground">Hurricane</span>
+              </>
+            )}
           </div>
           <h2 className="text-xl font-semibold tracking-tight">
             {mode === "in" ? "Sign in" : "Create account"}

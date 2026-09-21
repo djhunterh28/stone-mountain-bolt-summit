@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { completeOnboardingStep, getDashboard, getPortalMe } from "@/lib/portal/server";
-import { getOpsHome } from "@/lib/crm/ops";
+import { getHealth, getOpsHome } from "@/lib/crm/ops";
 import { formatBytes, formatDate, formatDateTime, formatUsd } from "@/lib/utils";
 
 export const Route = createFileRoute("/home")({ component: HomePage });
@@ -22,6 +22,7 @@ function HomePage() {
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: () => getDashboard() });
   const me = useQuery({ queryKey: ["portal-me"], queryFn: () => getPortalMe() });
   const ops = useQuery({ queryKey: ["ops-home"], queryFn: () => getOpsHome() });
+  const health = useQuery({ queryKey: ["health"], queryFn: () => getHealth() });
   const qc = useQueryClient();
   const d = dash.data;
   const onboard = me.data?.onboarding;
@@ -80,7 +81,7 @@ function HomePage() {
         <Button asChild size="sm" variant="ghost"><Link to="/guests">Guests</Link></Button>
       </div>
 
-      <div className="mt-6 grid gap-4 px-4 sm:px-6 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 px-4 sm:px-6 lg:grid-cols-2 xl:grid-cols-4">
         <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
           <h2 className="text-sm font-medium">Upcoming events</h2>
           <ul className="mt-2 space-y-2">
@@ -103,6 +104,22 @@ function HomePage() {
                 <span className="ml-2 text-xs text-muted-foreground">{a.owner}</span>
               </li>
             ))}
+          </ul>
+        </section>
+        <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">
+          <h2 className="text-sm font-medium">Health flags</h2>
+          <ul className="mt-2 space-y-2">
+            {(health.data?.flags ?? []).slice(0, 5).map((f) => (
+              <li key={f.id} className="text-sm">
+                <Link to="/deals/$dealId" params={{ dealId: String(f.id) }} className="hover:underline">
+                  {f.title}
+                </Link>
+                <span className="ml-2 text-xs text-muted-foreground">{f.issues[0]}</span>
+              </li>
+            ))}
+            {(health.data?.flags ?? []).length === 0 && (
+              <li className="text-sm text-muted-foreground">Booked shows are clean.</li>
+            )}
           </ul>
         </section>
         <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]">

@@ -148,7 +148,7 @@ export const getTravelDesk = createServerFn({ method: "GET" })
       `select distinct p.id, p.name, p.lat, p.lng, d.title as deal_title, d.load_in
        from deals d
        join travel_places p on (p.org_id = d.org_id or p.name = d.venue)
-       where d.status <> 'lost' and d.event_date = current_date
+       where d.status not in ('lost', 'cancelled') and d.event_date = current_date
        order by d.load_in nulls last`,
     );
     return {

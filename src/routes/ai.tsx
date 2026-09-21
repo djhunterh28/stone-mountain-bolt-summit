@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { draftFromDeal, getAiDesk, markFinding, saveAiProfile } from "@/lib/crm/ops";
+import { draftFromDeal, getAiDesk, markFinding, runPrepInspector, saveAiProfile, sendAiDraft } from "@/lib/crm/ops";
 import { listDeals } from "@/lib/crm/server";
 
 export const Route = createFileRoute("/ai")({ component: AiPage });
@@ -21,6 +21,11 @@ function AiPage() {
   const [dealId, setDealId] = useState(1);
   const [prompt, setPrompt] = useState("Confirm load-in and ask if the dock is still 47th.");
   const [draft, setDraft] = useState<string | null>(null);
+  const [faqText, setFaqText] = useState("");
+
+  function refresh() {
+    void qc.invalidateQueries({ queryKey: ["ai-desk"] });
+  }
 
   return (
     <div className="pb-12">
@@ -35,7 +40,7 @@ function AiPage() {
           </TabsList>
           <TabsContent value="draft" className="mt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Tone-matched to the company profile. Merge tags fill client, venue, date, AE, and signature. Edit before send.
+              Tone-matched to the company profile. Merge tags {"{{client}} {{venue}} {{event_date}} {{ae}} {{signature}}"} fill from the event. Edit, then send — always in your voice.
             </p>
             <div className="flex flex-wrap gap-2">
               <select className="h-9 max-w-xs rounded-md border border-input bg-background px-2 text-sm" value={dealId} onChange={(e) => setDealId(Number(e.target.value))}>
@@ -51,7 +56,7 @@ function AiPage() {
                     if (r.ok) {
                       setDraft(r.body);
                       toast.success("Draft ready — still yours to send");
-                      qc.invalidateQueries({ queryKey: ["ai-desk"] });
+                      refresh();
                     } else toast.error(r.error);
                   })
                 }
@@ -63,16 +68,50 @@ function AiPage() {
             <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
               {(desk.data?.drafts ?? []).map((d) => (
                 <li key={d.id} className="px-4 py-3 text-sm">
-                  <span className="font-medium">{d.dealTitle}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{d.prompt}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{d.dealTitle}</span>
+                    <span className="text-xs text-muted-foreground">{d.prompt}</span>
+                    {d.sent ? <Badge variant="success">sent</Badge> : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          sendAiDraft({ data: { id: d.id } }).then((r) => {
+                            if (!r.ok) toast.error(r.error ?? "Not sent");
+                            else toast.success("Queued from your domain");
+                            refresh();
+                          })
+                        }
+                      >
+                        Send
+                      </Button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
           </TabsContent>
           <TabsContent value="prep" className="mt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Gaps on the record, plus read-only Gmail/Outlook comparisons. Findings stay marked until you verify. Nothing auto-applies.
+              Empty timed sections, conflicting contacts, burn-risk closers. Connected Gmail/Outlook is read-only — findings stay marked until you verify. Nothing auto-applies. Built for DJ and live entertainment orgs.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() =>
+                  runPrepInspector().then((r) => {
+                    toast.success(`Inspector added ${r.added} finding${r.added === 1 ? "" : "s"} · ${r.vertical}`);
+                    refresh();
+                  })
+                }
+              >
+                Run inspector
+              </Button>
+              <Badge variant={p?.mailConnected ? "success" : "outline"}>
+                {p?.mailProvider ?? "gmail"} {p?.mailConnected ? "connected · read-only" : "offline"}
+              </Badge>
+              <Badge variant="outline">{p?.vertical ?? "live entertainment"}</Badge>
+            </div>
             <ul className="divide-y divide-border rounded-xl bg-card shadow-[var(--shadow-border)]">
               {(desk.data?.findings ?? []).map((f) => (
                 <li key={f.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
@@ -87,11 +126,11 @@ function AiPage() {
                   {f.verified ? (
                     <Badge variant="success">verified</Badge>
                   ) : (
-                    <Button size="sm" variant="secondary" onClick={() => markFinding({ data: { id: f.id, verified: true } }).then(() => qc.invalidateQueries({ queryKey: ["ai-desk"] }))}>
+                    <Button size="sm" variant="secondary" onClick={() => markFinding({ data: { id: f.id, verified: true } }).then(refresh)}>
                       Verify
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => markFinding({ data: { id: f.id, dismissed: true } }).then(() => qc.invalidateQueries({ queryKey: ["ai-desk"] }))}>
+                  <Button size="sm" variant="ghost" onClick={() => markFinding({ data: { id: f.id, dismissed: true } }).then(refresh)}>
                     Dismiss
                   </Button>
                 </li>
@@ -105,6 +144,7 @@ function AiPage() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   const fd = new FormData(e.currentTarget);
+                  const faqs = faqText.trim() || JSON.stringify(p.faqs);
                   void saveAiProfile({
                     data: {
                       tone: String(fd.get("tone")),
@@ -113,10 +153,13 @@ function AiPage() {
                       greeting: String(fd.get("greeting")),
                       packages: String(fd.get("packages")),
                       portalDomain: String(fd.get("portalDomain") || p.portalDomain),
+                      faqsJson: faqs,
+                      mailConnected: fd.get("mail") === "on",
+                      mailProvider: String(fd.get("mailProvider") || p.mailProvider),
                     },
                   }).then(() => {
                     toast.success("Profile drives drafts and the widget");
-                    qc.invalidateQueries({ queryKey: ["ai-desk"] });
+                    refresh();
                   });
                 }}
               >
@@ -133,14 +176,26 @@ function AiPage() {
                 <label className="text-sm">Service area<Input name="serviceArea" defaultValue={p.serviceArea} className="mt-1" /></label>
                 <label className="text-sm">Greeting<Textarea name="greeting" defaultValue={p.greeting} className="mt-1" /></label>
                 <label className="text-sm">Packages the widget may name<Input name="packages" defaultValue={JSON.stringify(p.packages)} className="mt-1" /></label>
+                <label className="text-sm">FAQ library (JSON)
+                  <Textarea
+                    className="mt-1 font-mono text-xs"
+                    value={faqText || JSON.stringify(p.faqs, null, 2)}
+                    onChange={(e) => setFaqText(e.target.value)}
+                  />
+                </label>
                 <label className="text-sm">White-label portal domain<Input name="portalDomain" defaultValue={p.portalDomain} className="mt-1" /></label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="mail" defaultChecked={p.mailConnected} />
+                  Mail connected (read-only)
+                </label>
+                <label className="text-sm">
+                  Provider
+                  <select name="mailProvider" defaultValue={p.mailProvider} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2">
+                    <option value="gmail">Gmail</option>
+                    <option value="outlook">Outlook</option>
+                  </select>
+                </label>
                 <Button type="submit" size="sm">Save profile</Button>
-                <ul className="text-sm text-muted-foreground">
-                  {p.faqs.map((f) => (
-                    <li key={f.q}><span className="text-foreground">{f.q}</span> — {f.a}</li>
-                  ))}
-                </ul>
-                <p className="text-xs text-muted-foreground">White-label portal: {p.portalDomain}</p>
               </form>
             )}
           </TabsContent>
@@ -148,7 +203,7 @@ function AiPage() {
             <p className="text-sm text-muted-foreground">
               One-line embed. Answers availability from the live calendar, captures a lead when they try to hold a date, branded with your greeting.
             </p>
-            <pre className="overflow-x-auto rounded-xl bg-card p-4 font-mono text-xs shadow-[var(--shadow-border)]">{`<script src="https://northline.av/w/${p?.widgetSlug ?? "northline"}" async></script>`}</pre>
+            <pre className="overflow-x-auto rounded-xl bg-card p-4 font-mono text-xs shadow-[var(--shadow-border)]">{`<script src="https://${p?.portalDomain ?? "portal.hurricaneproductionsllc.com"}/w/${p?.widgetSlug ?? "northline"}" async></script>`}</pre>
             <Button asChild size="sm" variant="secondary">
               <Link to="/w/$slug" params={{ slug: p?.widgetSlug ?? "northline" }}>Open widget</Link>
             </Button>

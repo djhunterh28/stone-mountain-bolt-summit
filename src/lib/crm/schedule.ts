@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSql, type Sql } from "@/lib/db";
 import { iso } from "@/lib/utils";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { insertOutbound } from "./domain";
 
 export type ScheduleProvider = "calendly" | "tidycal" | "acuity" | "zoom";
 
@@ -145,12 +146,16 @@ async function fulfillBooking(sql: Sql, bookingId: number) {
     const when = nyStamp(starts);
     const first = guest.split(" ")[0] ?? guest;
     const zoomLine = zoomJoin ? `Zoom: ${zoomJoin}  (passcode ${zoomPass})` : "We will send a venue call sheet separately.";
-    const body = `Hi ${first} —\n\nYou are confirmed with ${hostName} for ${title} on ${when} ET (${duration} min).\n\n${zoomLine}\n\nReply to this thread if the hold moves. The Gowanus shop is on 718-555-0140.\n\n— ${hostName}\nNorthline`;
-    await sql.query(
-      `insert into emails (folder, from_name, from_addr, to_addr, subject, body, opened, clicked, sent_at)
-       values ('sent', $1, $2, $3, $4, $5, false, false, now())`,
-      [hostName, hostEmail, guestEmail, `Confirmed: ${title} — ${when}`, body],
-    );
+    const body = `Hi ${first} —\n\nYou are confirmed with ${hostName} for ${title} on ${when} ET (${duration} min).\n\n${zoomLine}\n\nReply to this thread if the hold moves. The Gowanus shop is on 718-555-0140.\n\n— ${hostName}\nHurricane Productions`;
+    await insertOutbound(sql, {
+      purpose: "workflow",
+      mailKind: "transactional",
+      toAddr: guestEmail,
+      subject: `Confirmed: ${title} — ${when}`,
+      body,
+      fallbackName: hostName,
+      hintAddr: hostEmail,
+    });
     await sql.query(`update bookings set confirmation_sent_at = now() where id = $1`, [bookingId]);
   }
 

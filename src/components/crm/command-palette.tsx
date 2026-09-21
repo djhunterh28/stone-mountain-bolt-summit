@@ -10,13 +10,15 @@ const PAGES = [
   { label: "Home", to: "/home" },
   { label: "Pipeline", to: "/" },
   { label: "Leads inbox", to: "/leads" },
+  { label: "Event lifecycle", to: "/lifecycle" },
   { label: "Pulse", to: "/pulse" },
-  { label: "Contacts", to: "/contacts" },
+  { label: "Client registry", to: "/registry" },
   { label: "Calendar", to: "/activities" },
   { label: "Projects", to: "/projects" },
   { label: "Insights", to: "/insights" },
   { label: "Goals", to: "/goals" },
   { label: "Mail", to: "/mail" },
+  { label: "Sending domain", to: "/domain" },
   { label: "Documents", to: "/documents" },
   { label: "Products", to: "/products" },
   { label: "Automations", to: "/automations" },
@@ -27,22 +29,22 @@ const PAGES = [
   { label: "Forms", to: "/forms" },
   { label: "Prospector", to: "/prospector" },
   { label: "Scheduler", to: "/scheduler" },
-  { label: "Marketplace", to: "/marketplace" },
+  { label: "Marketplace", to: "/settings?tab=marketplace" },
   { label: "Forecast", to: "/forecast" },
   { label: "Display boards", to: "/boards" },
   { label: "Mileage & travel", to: "/travel" },
-  { label: "Import", to: "/import" },
-  { label: "Sandbox", to: "/sandbox" },
+  { label: "Import / export", to: "/settings?tab=import" },
+  { label: "Sandbox", to: "/settings?tab=sandbox" },
   { label: "Developers", to: "/developers" },
   { label: "Integrations", to: "/integrations" },
   { label: "Settings", to: "/settings" },
-  { label: "Security", to: "/security" },
+  { label: "Security", to: "/settings?tab=security" },
   { label: "Files", to: "/files" },
   { label: "Approvals", to: "/approvals" },
   { label: "Tasks", to: "/tasks" },
   { label: "E-sign", to: "/esign" },
   { label: "Proposals", to: "/proposals" },
-  { label: "Admin", to: "/admin" },
+  { label: "Admin", to: "/settings?tab=admin" },
   { label: "Profile", to: "/profile" },
   { label: "Bookmarks", to: "/bookmarks" },
   { label: "AI desk", to: "/ai" },
@@ -50,10 +52,17 @@ const PAGES = [
   { label: "Finance", to: "/finance" },
   { label: "Quotes", to: "/quotes" },
   { label: "Broadcasts", to: "/broadcasts" },
+  { label: "Sending domain", to: "/domain" },
+  { label: "Portal domain", to: "/portal-domain" },
+  { label: "Client portal", to: "/client-portal" },
+  { label: "SMTP", to: "/smtp" },
+  { label: "SMS via QUO", to: "/sms" },
+  { label: "Cold lists", to: "/cold" },
   { label: "Crew & calendar", to: "/crew" },
+  { label: "Unique views", to: "/views" },
   { label: "Guest lists", to: "/guests" },
-  { label: "Floor plans", to: "/floorplans" },
-  { label: "Reviews", to: "/reviews" },
+  { label: "Floor plan designer", to: "/floorplans" },
+  { label: "Reviews & reputation", to: "/reviews" },
   { label: "Freelance gigs", to: "/gigs" },
   { label: "Event hand-off", to: "/handoff" },
   { label: "Directory", to: "/discover" },
@@ -87,6 +96,13 @@ export function CommandPalette() {
       const deal = to.match(/^\/deals\/(\d+)/)?.[1];
       if (deal) {
         void navigate({ to: "/deals/$dealId", params: { dealId: deal } });
+        return;
+      }
+      const qIx = to.indexOf("?");
+      if (qIx >= 0) {
+        const path = to.slice(0, qIx);
+        const params = Object.fromEntries(new URLSearchParams(to.slice(qIx + 1)));
+        void navigate({ to: path as "/", search: params });
         return;
       }
       void navigate({ to: to as "/" });

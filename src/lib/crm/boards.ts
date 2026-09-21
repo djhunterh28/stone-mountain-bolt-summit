@@ -31,6 +31,7 @@ export type BoardJob = {
   stageName: string | null;
   ownerName: string | null;
   ownerInitials: string | null;
+  crewNames: string[];
   value: number;
   notes: string | null;
   lane: BoardLane;
@@ -186,7 +187,7 @@ export const getBoardPublic = createServerFn({ method: "GET" })
 
     const today = nyToday();
     const from = shiftDay(today, -1);
-    const to = shiftDay(today, 1);
+    const to = shiftDay(today, 2);
     const dealRows = await sql.query(
       `select d.id, d.title, d.value, d.event_date, d.venue, d.load_in, d.guest_count, d.indoor,
               d.status, d.notes, o.name as org_name, m.name as owner_name, m.initials as owner_initials,
@@ -195,7 +196,7 @@ export const getBoardPublic = createServerFn({ method: "GET" })
        left join organizations o on o.id = d.org_id
        left join members m on m.id = d.owner_id
        left join stages s on s.id = d.stage_id
-       where d.status <> 'lost'
+       where d.status not in ('lost', 'cancelled')
          and d.event_date is not null
          and d.event_date::date between $1::date and $2::date
        order by d.load_in nulls last, d.event_date, d.id`,
@@ -218,6 +219,25 @@ export const getBoardPublic = createServerFn({ method: "GET" })
       const list = byDeal.get(id) ?? [];
       list.push({ name: String(p.name), category: String(p.category), qty: money(p.qty) });
       byDeal.set(id, list);
+    }
+
+    const crewRows =
+      ids.length === 0
+        ? []
+        : await sql.query(
+            `select cs.deal_id, m.name, cs.role
+             from crew_shifts cs
+             join members m on m.id = cs.member_id
+             where cs.deal_id in (${ids.join(",")})
+             order by cs.starts_at`,
+          ).catch(() => [] as Record<string, unknown>[]);
+    const crewByDeal = new Map<number, string[]>();
+    for (const c of crewRows) {
+      const id = Number(c.deal_id);
+      const label = `${String(c.name).split(" ")[0]}${c.role ? ` (${c.role})` : ""}`;
+      const list = crewByDeal.get(id) ?? [];
+      if (!list.includes(label)) list.push(label);
+      crewByDeal.set(id, list);
     }
 
     const jobs: BoardJob[] = dealRows.map((r) => {
@@ -245,6 +265,7 @@ export const getBoardPublic = createServerFn({ method: "GET" })
         stageName: r.stage_name == null ? null : String(r.stage_name),
         ownerName: r.owner_name == null ? null : String(r.owner_name),
         ownerInitials: r.owner_initials == null ? null : String(r.owner_initials),
+        crewNames: (crewByDeal.get(id) ?? []).slice(0, 4),
         value: money(r.value),
         notes: r.notes == null ? null : String(r.notes),
         lane,

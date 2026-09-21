@@ -192,12 +192,33 @@ html.nl-contrast {
 }
 
 .kanban-col {
-  min-width: 17.5rem;
+  position: relative;
+  flex: 0 0 auto;
+  width: 17.5rem;
+  min-width: 13.75rem;
+}
+
+.kanban-resize {
+  position: absolute;
+  top: 0.5rem;
+  right: -3px;
+  z-index: 2;
+  width: 8px;
+  bottom: 0.5rem;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  border-radius: 99px;
+  background: transparent;
+}
+.kanban-resize:hover,
+.kanban-resize.is-active {
+  background: color-mix(in oklab, var(--nl-primary) 45%, transparent);
 }
 
 @media (max-width: 639px) {
   .kanban-col {
-    min-width: 82vw;
+    min-width: min(82vw, 20rem);
   }
 }
 
@@ -224,4 +245,63 @@ html.nl-kiosk-root body {
   --nl-warn: #c4a15a;
   --nl-steel: #8a96a6;
   --nl-border: color-mix(in oklab, #eef0f2 12%, transparent);
+}
+
+html[data-brand="portal"] {
+  --nl-primary: #0d47a1;
+  --nl-primary-foreground: #f5f3ee;
+  --nl-ring: #0d47a1;
+  --nl-steel: #0d47a1;
+}
+
+.nl-stage-row {
+  display: flex;
+  width: 100%;
+  min-height: 2.25rem;
+}
+.nl-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 6.5rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.1rem 0 1.35rem;
+  margin-right: -9px;
+  border: 0;
+  background: var(--nl-muted);
+  color: var(--nl-muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 1.15;
+  text-align: center;
+  letter-spacing: 0.01em;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
+}
+.nl-stage:first-child {
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+  padding-left: 0.85rem;
+}
+.nl-stage:last-child {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%);
+  margin-right: 0;
+}
+.nl-stage.is-done,
+.nl-stage.is-current {
+  background: var(--nl-success);
+  color: var(--nl-primary-foreground);
+}
+.nl-stage.is-won {
+  background: var(--nl-success);
+  color: var(--nl-primary-foreground);
+}
+.nl-stage.is-lost {
+  background: var(--nl-destructive);
+  color: var(--nl-destructive-foreground);
+}
+.nl-stage:focus-visible {
+  outline: 2px solid var(--nl-ring);
+  outline-offset: 2px;
+  z-index: 1;
 }

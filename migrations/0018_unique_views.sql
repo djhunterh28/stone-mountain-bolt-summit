@@ -71,4 +71,10 @@ join (values
   (1, 2, 'LED TD', interval '5 hours', interval '16 hours', 'setup'),
   (1, 3, 'Stage', interval '18 hours', interval '22 hours', 'strike')
 ) as m(deal_id, member_id, role, start_off, end_off, kind) on m.deal_id = d.id
-where d.id in (1, 4, 6, 7, 15, 16);
+where d.id in (1, 4, 6, 7, 15, 16)
+  and not exists (
+    select 1 from crew_shifts s
+    where s.deal_id = d.id
+      and s.member_id = m.member_id
+      and s.starts_at = d.event_date::timestamp + m.start_off
+  );

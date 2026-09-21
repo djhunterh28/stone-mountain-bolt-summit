@@ -53,12 +53,22 @@ export const WEBHOOK_EVENTS = [
   },
   {
     event: "deal.lost",
-    summary: "Hold released",
+    summary: "Hold released — lost to budget, house AV, or a competitor",
     payload: {
       id: "evt_8f5",
       event: "deal.lost",
       created_at: "2026-09-21T19:02:00.000Z",
       data: { id: 8, status: "lost", lost_reason: "Budget" },
+    },
+  },
+  {
+    event: "deal.cancelled",
+    summary: "The event itself died — not a competitive loss",
+    payload: {
+      id: "evt_8f6",
+      event: "deal.cancelled",
+      created_at: "2026-09-21T19:40:00.000Z",
+      data: { id: 21, status: "cancelled", lost_reason: "Date pulled" },
     },
   },
   {
@@ -202,7 +212,7 @@ export const REST_ENDPOINTS = [
     method: "PATCH",
     path: "/api/v1/deals/:id",
     scope: "deals:write",
-    summary: "Update stage, value, or status. Fires deal.updated / deal.won / deal.lost.",
+    summary: "Update stage, value, or status. Fires deal.updated / deal.won / deal.lost / deal.cancelled.",
     public: false,
   },
   {

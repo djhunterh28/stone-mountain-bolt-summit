@@ -74,7 +74,13 @@ function InsightsPage() {
             <Stat label="Open pipeline" value={formatUsdFull(d.openValue)} hint={`${d.openCount} deals`} />
             <Stat label="Weighted" value={formatUsdFull(d.weightedValue)} hint="By stage probability" />
             <Stat label="Won (booked)" value={formatUsdFull(d.wonValue)} hint={`${d.winRate}% win rate`} />
-            <Stat label="Avg won deal" value={formatUsdFull(d.avgDeal)} hint={`${d.rottingCount} rotting`} />
+            <Stat label="Lead conversion" value={`${health.data?.conversion ?? "—"}%`} hint={`${health.data?.leadConverted ?? 0} of ${health.data?.leadN ?? 0} leads`} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 px-4 sm:grid-cols-4 sm:px-6">
+            <Stat label="Collected" value={health.data ? formatUsdFull(health.data.kpis.collected) : "—"} hint={health.data ? `of ${formatUsdFull(health.data.kpis.invoiced)} invoiced` : ""} />
+            <Stat label="Abandoned quotes" value={String(health.data?.abandoned ?? "—")} hint={`${health.data?.quotes ?? 0} quotes total`} />
+            <Stat label="Ghosted" value={String(health.data?.ghosted.length ?? "—")} hint="Open > 14 days silent" />
+            <Stat label="Health flags" value={String(health.data?.flags.length ?? "—")} hint="Contract / schedule / $0" />
           </div>
           {ai && <p className="mx-4 mt-4 rounded-xl bg-card p-4 text-sm leading-relaxed shadow-[var(--shadow-border)] sm:mx-6">{ai}</p>}
           <div className="mt-4 grid gap-4 px-4 sm:px-6 lg:grid-cols-2">
@@ -204,6 +210,9 @@ function InsightsPage() {
                   );
                 })}
               </div>
+              <Button asChild size="sm" variant="ghost" className="mt-3">
+                <Link to="/views">Open unique views</Link>
+              </Button>
             </Card>
           </div>
         </>

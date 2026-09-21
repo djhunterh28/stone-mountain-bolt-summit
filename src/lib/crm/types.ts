@@ -1,5 +1,5 @@
-export type DealStatus = "open" | "won" | "lost";
-export type LeadStatus = "new" | "contacted" | "qualified" | "archived";
+export type DealStatus = "open" | "won" | "lost" | "cancelled";
+export type LeadStatus = "new" | "contacted" | "qualified" | "nurture" | "converted" | "disqualified" | "archived";
 
 export type Member = {
   id: number;
@@ -52,6 +52,7 @@ export type DealCard = {
   indoor: boolean | null;
   loadIn: string | null;
   source: string | null;
+  eventType: string | null;
   notes: string | null;
   probability: number | null;
   stageEnteredAt: string | null;
@@ -101,11 +102,19 @@ export type Lead = {
   ownerInitials: string | null;
   ownerTone: string | null;
   source: string;
+  eventType: string | null;
+  eventDate: string | null;
+  venue: string | null;
+  estimatedValue: number;
+  disqualifyReason: string | null;
+  dealId: number | null;
   score: number;
   status: LeadStatus;
   labels: string | null;
   notes: string | null;
   createdAt: string;
+  stageEnteredAt: string | null;
+  daysInStage: number;
 };
 
 export type Person = {
@@ -119,6 +128,7 @@ export type Person = {
   ownerId: number | null;
   ownerName: string | null;
   city: string | null;
+  address?: string | null;
   lat: number | null;
   lng: number | null;
   createdAt: string;
@@ -252,6 +262,8 @@ export type EmailRow = {
   scheduledAt: string | null;
   sentAt: string | null;
   createdAt: string;
+  authenticated: boolean;
+  domainId: number | null;
 };
 
 export type EmailTemplate = {
@@ -544,6 +556,15 @@ export type LostReason = {
   name: string;
   sortOrder: number;
   active: boolean;
+  kind: "lost" | "cancelled";
+};
+
+export type EventType = {
+  id: number;
+  name: string;
+  slug: string;
+  sortOrder: number;
+  active: boolean;
 };
 
 export type LeadRoute = {
@@ -653,6 +674,9 @@ export type MailBroadcast = {
   audience: string;
   sentCount: number;
   opened: number;
+  suppressedCount?: number;
+  skipped?: number;
+  fromAddr?: string | null;
   createdAt: string;
 };
 
@@ -698,4 +722,5 @@ export type Bootstrap = {
   products: Product[];
   lostReasons: LostReason[];
   activityTypes: ActivityType[];
+  eventTypes: EventType[];
 };

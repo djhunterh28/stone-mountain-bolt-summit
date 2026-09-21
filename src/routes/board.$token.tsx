@@ -70,6 +70,14 @@ function KioskBoard() {
     for (const job of jobs) map[job.lane].push(job);
     return map;
   }, [jobs]);
+  const nextPull = useMemo(() => {
+    const upcoming = jobs
+      .filter((j) => j.lane === "going_out" || (j.lane === "on_site" && j.dayLabel === "today"))
+      .slice()
+      .sort((a, b) => (a.loadIn ?? "99").localeCompare(b.loadIn ?? "99"));
+    return upcoming[0] ?? null;
+  }, [jobs]);
+  const kind = view?.board.kind ?? "warehouse";
 
   if (q.isLoading && !view) {
     return (
@@ -90,8 +98,6 @@ function KioskBoard() {
       </main>
     );
   }
-
-  const kind = view?.board.kind ?? "warehouse";
 
   return (
     <main
@@ -121,6 +127,16 @@ function KioskBoard() {
       </header>
 
       {kind === "office" && <OfficeStrip jobs={jobs} />}
+      {kind === "warehouse" && nextPull && (
+        <div className="mb-3 px-[4vw]">
+          <div className="flex flex-wrap items-baseline gap-4 rounded-2xl bg-card px-5 py-3">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase">Next pull</p>
+            <p className="font-mono text-3xl tabular-nums">{nextPull.loadIn ?? "—"}</p>
+            <p className="text-lg font-medium">{nextPull.title}</p>
+            <p className="text-sm text-muted-foreground">{[nextPull.venue, nextPull.trucks ? `${Math.round(nextPull.trucks)} truck` : null, nextPull.crew ? `${Math.round(nextPull.crew)} crew` : null].filter(Boolean).join(" · ")}</p>
+          </div>
+        </div>
+      )}
 
       <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-[4vw] pb-4 lg:grid-cols-3">
         {LANES.map((lane) => (
@@ -179,6 +195,9 @@ function JobRow({ job, kind }: { job: BoardJob; kind: "warehouse" | "office" }) 
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{meta.join(" · ") || "No venue"}</p>
           {kind === "warehouse" && job.gear.length > 0 && (
             <p className="mt-2 truncate font-mono text-[11px] tracking-wide text-primary">{job.gear.join("  ·  ")}</p>
+          )}
+          {kind === "warehouse" && job.crewNames.length > 0 && (
+            <p className="mt-1 truncate text-xs text-muted-foreground">{job.crewNames.join(" · ")}</p>
           )}
           {kind === "office" && job.notes && <p className="mt-2 line-clamp-1 text-sm text-muted-foreground">{job.notes}</p>}
         </div>

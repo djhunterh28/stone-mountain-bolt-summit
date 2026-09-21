@@ -1,0 +1,1 @@
+import{t as e}from"./react-SIfiwpqq.js";import{r as t}from"./preload-helper-BF-5aA19.js";import{t as n}from"./utils-CFDj2cR8.js";e();var r=t();function i({className:e,...t}){return(0,r.jsx)(`label`,{className:n(`text-xs font-medium text-muted-foreground`,e),...t})}export{i as t};

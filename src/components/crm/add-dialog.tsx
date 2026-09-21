@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUi } from "@/lib/crm/store";
 import { createActivity, createDeal, createLead, createOrg, createPerson, getBootstrap } from "@/lib/crm/server";
+import { EVENT_TYPES, LEAD_SOURCES } from "@/lib/crm/lifecycle";
 
 const KINDS = ["deal", "lead", "person", "org", "activity"] as const;
 
@@ -33,6 +34,7 @@ export function AddDialog() {
   const [kind, setKind] = useState<(typeof KINDS)[number]>(addKind);
   const [pending, setPending] = useState(false);
   const [source, setSource] = useState("Web form");
+  const [eventType, setEventType] = useState("Corporate gala");
   const [actType, setActType] = useState("site-survey");
 
   const onOpen = (open: boolean) => {
@@ -56,10 +58,12 @@ export function AddDialog() {
             venue: String(fd.get("venue") || "") || undefined,
             eventDate: String(fd.get("eventDate") || "") || null,
             source: "Manual",
+            eventType,
           },
         });
         toast.success("Deal created");
         qc.invalidateQueries({ queryKey: ["deals"] });
+        qc.invalidateQueries({ queryKey: ["lifecycle"] });
       } else if (kind === "lead") {
         await createLead({
           data: {
@@ -67,10 +71,14 @@ export function AddDialog() {
             source: source,
             ownerId: memberId,
             notes: String(fd.get("notes") || "") || undefined,
+            eventType,
+            venue: String(fd.get("venue") || "") || undefined,
+            estimatedValue: Number(fd.get("value") || 0) || undefined,
           },
         });
         toast.success("Lead captured");
         qc.invalidateQueries({ queryKey: ["leads"] });
+        qc.invalidateQueries({ queryKey: ["lifecycle"] });
       } else if (kind === "person") {
         await createPerson({
           data: {
@@ -138,11 +146,30 @@ export function AddDialog() {
                 <Field name="venue" label="Venue" placeholder="Cipriani 42nd" />
               </div>
               <Field name="eventDate" label="Event date" type="date" />
+              <div className="space-y-1">
+                <Label htmlFor="deal-type">Event type</Label>
+                <Select value={eventType} onValueChange={setEventType}>
+                  <SelectTrigger id="deal-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(boot.data?.eventTypes?.map((t) => t.name) ?? [...EVENT_TYPES]).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </>
           )}
           {kind === "lead" && (
             <>
               <Field name="title" label="Lead" placeholder="Warehouse rave — Bushwick" />
+              <div className="grid grid-cols-2 gap-3">
+                <Field name="venue" label="Venue" placeholder="Cipriani 42nd" />
+                <Field name="value" label="Est. value" type="number" placeholder="45000" />
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="source">Source</Label>
                 <Select value={source} onValueChange={setSource}>
@@ -150,7 +177,22 @@ export function AddDialog() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["Web form", "Chatbot", "Live chat", "Prospector", "Referral", "Email"].map((s) => (
+                    {LEAD_SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="lead-type">Event type</Label>
+                <Select value={eventType} onValueChange={setEventType}>
+                  <SelectTrigger id="lead-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(boot.data?.eventTypes?.map((t) => t.name) ?? [...EVENT_TYPES]).map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>

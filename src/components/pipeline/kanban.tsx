@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Clock, Flame, GripVertical, MapPin } from "lucide-react";
 import { MemberAvatar } from "@/components/crm/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate, formatUsd } from "@/lib/utils";
+import { DEFAULT_COL_WIDTH, MAX_COL_WIDTH, MIN_COL_WIDTH } from "@/lib/crm/prefs";
 import type { DealCard, Stage } from "@/lib/crm/types";
 
 export function Kanban({
@@ -10,14 +11,22 @@ export function Kanban({
   deals,
   onMove,
   onOpen,
+  columnWidths,
+  onColumnWidths,
+  onColumnWidthsCommit,
 }: {
   stages: Stage[];
   deals: DealCard[];
   onMove: (dealId: number, stageId: number) => void;
   onOpen: (dealId: number) => void;
+  columnWidths?: Record<number, number>;
+  onColumnWidths?: (next: Record<number, number>) => void;
+  onColumnWidthsCommit?: (next: Record<number, number>) => void;
 }) {
   const [dragging, setDragging] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
+  const [resizing, setResizing] = useState<number | null>(null);
+  const drag = useRef<{ id: number; startX: number; startW: number } | null>(null);
 
   const grouped = useMemo(() => {
     const map = new Map<number, DealCard[]>();
@@ -30,19 +39,63 @@ export function Kanban({
     return map;
   }, [stages, deals]);
 
+  function widthOf(id: number) {
+    return columnWidths?.[id] ?? DEFAULT_COL_WIDTH;
+  }
+
+  function applyWidth(id: number, px: number) {
+    const next = {
+      ...(columnWidths ?? {}),
+      [id]: Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, Math.round(px))),
+    };
+    onColumnWidths?.(next);
+    return next;
+  }
+
+  function startResize(e: React.PointerEvent, id: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { id, startX: e.clientX, startW: widthOf(id) };
+    setResizing(id);
+  }
+
+  function onResizeMove(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d) return;
+    applyWidth(d.id, d.startW + (e.clientX - d.startX));
+  }
+
+  function endResize(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    const next = applyWidth(d.id, d.startW + (e.clientX - d.startX));
+    drag.current = null;
+    setResizing(null);
+    onColumnWidthsCommit?.(next);
+  }
+
   return (
     <div className="flex h-full gap-3 overflow-x-auto px-4 pb-6 sm:px-6 scrollbar-thin">
       {stages.map((stage) => {
         const cards = grouped.get(stage.id) ?? [];
         const total = cards.reduce((s, d) => s + d.value, 0);
+        const w = widthOf(stage.id);
         return (
           <section
             key={stage.id}
+            style={{ width: w, minWidth: w, maxWidth: w }}
             className={cn(
               "kanban-col flex max-h-full flex-col rounded-xl bg-card p-2 shadow-[var(--shadow-border)]",
               over === stage.id && "ring-1 ring-primary/50",
             )}
             onDragOver={(e) => {
+              if (resizing) return;
               e.preventDefault();
               setOver(stage.id);
             }}
@@ -56,8 +109,8 @@ export function Kanban({
             }}
           >
             <header className="flex items-baseline justify-between gap-2 px-2 py-2">
-              <div>
-                <h2 className="text-sm font-medium">{stage.name}</h2>
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-medium">{stage.name}</h2>
                 <p className="text-[11px] text-muted-foreground">
                   {cards.length} · {stage.probability}%
                 </p>
@@ -79,6 +132,25 @@ export function Kanban({
                 />
               ))}
             </div>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={`Resize ${stage.name}`}
+              title="Drag to resize · double-click to reset"
+              className={cn("kanban-resize", resizing === stage.id && "is-active")}
+              onPointerDown={(e) => startResize(e, stage.id)}
+              onPointerMove={onResizeMove}
+              onPointerUp={endResize}
+              onPointerCancel={endResize}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const next = { ...(columnWidths ?? {}) };
+                delete next[stage.id];
+                onColumnWidths?.(next);
+                onColumnWidthsCommit?.(next);
+              }}
+            />
           </section>
         );
       })}

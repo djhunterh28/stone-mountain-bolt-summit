@@ -1,1 +1,0 @@
-import{d as e,r as t}from"./preload-helper-CD4nqO4H.js";var n=e();function r({className:e,orientation:r=`horizontal`}){return(0,n.jsx)(`div`,{role:`separator`,className:t(`shrink-0 bg-border`,r===`horizontal`?`h-px w-full`:`h-full w-px`,e)})}export{r as t};
