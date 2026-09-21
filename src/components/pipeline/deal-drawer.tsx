@@ -15,6 +15,7 @@ import {
   Pin,
   Sparkles,
   Users,
+  Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,14 +38,15 @@ import {
   toggleActivity,
   updateDeal,
 } from "@/lib/crm/server";
-import { addEventNote, draftFromDeal, listEventNotes, pinNote, updateEventNote } from "@/lib/crm/ops";
+import { addEventNote, attachNoteFiles, draftFromDeal, listEventNotes, pinNote, updateEventNote } from "@/lib/crm/ops";
 import { NoteHtml, NOTE_CATEGORIES, notePlain, RichTextEditor, sanitizeNoteHtml } from "@/components/crm/rich-text";
 import { FloorPlanDesk } from "@/components/crm/floor-plan-desk";
+import { DealMileageDesk } from "@/components/crm/deal-mileage";
 import { cloneDeal } from "@/lib/crm/ultimate";
-import { convertDealToProject, createEnvelope, createProposal } from "@/lib/portal/server";
+import { convertDealToProject, createEnvelope, createProposal, downloadPortalFile, uploadPortalFile } from "@/lib/portal/server";
 import { runAi } from "@/lib/crm/ai";
 import { useUi } from "@/lib/crm/store";
-import { cn, formatDate, formatDateTime, formatUsdFull } from "@/lib/utils";
+import { cn, formatBytes, formatDate, formatDateTime, formatUsdFull, saveBase64File } from "@/lib/utils";
 import type { DealDetail } from "@/lib/crm/types";
 
 export function DealWorkspace({ dealId }: { dealId: number }) {
@@ -111,7 +113,7 @@ function DealBody({
   const [qty, setQty] = useState("1");
   const [loseOpen, setLoseOpen] = useState<"lost" | "cancelled" | null>(null);
   const [lostReason, setLostReason] = useState("Budget");
-  const [pane, setPane] = useState<"activity" | "notes" | "email" | "files" | "invoice" | "floor">("activity");
+  const [pane, setPane] = useState<"activity" | "notes" | "email" | "files" | "invoice" | "floor" | "mileage">("activity");
   const [hist, setHist] = useState<"all" | "activity" | "note" | "email" | "file" | "invoice" | "log">("all");
   const [more, setMore] = useState(false);
   const [actSubject, setActSubject] = useState("");
@@ -585,6 +587,7 @@ function DealBody({
                   ["files", "Files"],
                   ["invoice", "Invoice"],
                   ["floor", "Floor plan"],
+                  ["mileage", "Mileage"],
                 ] as const
               ).map(([id, label]) => (
                 <Button key={id} size="sm" variant={pane === id ? "secondary" : "ghost"} onClick={() => setPane(id)}>
@@ -593,6 +596,7 @@ function DealBody({
                   {id === "email" && <Mail className="size-3.5" />}
                   {id === "files" && <Paperclip className="size-3.5" />}
                   {id === "floor" && <MapPin className="size-3.5" />}
+                  {id === "mileage" && <Truck className="size-3.5" />}
                   {label}
                 </Button>
               ))}
@@ -666,6 +670,38 @@ function DealBody({
                     <Badge variant="outline">{doc.status}</Badge>
                   </div>
                 ))}
+                <label className="inline-flex">
+                  <input
+                    type="file"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      void (async () => {
+                        const buf = await file.arrayBuffer();
+                        const slice = new Uint8Array(buf).slice(0, 240);
+                        const b64 = btoa(String.fromCharCode(...slice));
+                        const res = await uploadPortalFile({
+                          data: {
+                            name: file.name,
+                            sizeBytes: file.size,
+                            mime: file.type || "application/octet-stream",
+                            folder: "deals",
+                            dealId: d.id,
+                            contentB64: b64,
+                          },
+                        });
+                        if (!res.ok) toast.error("error" in res ? res.error : "Upload failed");
+                        else toast.success(`Attached ${file.name}`);
+                        onRefresh();
+                      })();
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button size="sm" asChild>
+                    <span>Upload file</span>
+                  </Button>
+                </label>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -730,6 +766,10 @@ function DealBody({
           {pane === "floor" ? (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
               <FloorPlanDesk dealId={d.id} venue={d.venue} title={d.title} />
+            </div>
+          ) : pane === "mileage" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <DealMileageDesk dealId={d.id} venue={d.venue} />
             </div>
           ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -863,33 +903,61 @@ function EventNotesPanel({ dealId, memberId }: { dealId: number; memberId: numbe
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [editorKey, setEditorKey] = useState(0);
+  const [pending, setPending] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
 
   function refresh() {
     void qc.invalidateQueries({ queryKey: ["event-notes", dealId] });
+    void qc.invalidateQueries({ queryKey: ["portal-files"] });
+    void qc.invalidateQueries({ queryKey: ["deal", dealId] });
   }
 
   const rows = (notes.data ?? []).filter((n) => filter === "all" || n.category === filter);
 
+  async function encodeFiles(list: File[]) {
+    const out: { name: string; sizeBytes: number; mime: string; contentB64: string }[] = [];
+    for (const file of list.slice(0, 12)) {
+      const buf = await file.arrayBuffer();
+      const slice = new Uint8Array(buf).slice(0, 240);
+      const b64 = btoa(String.fromCharCode(...slice));
+      out.push({
+        name: file.name,
+        sizeBytes: file.size,
+        mime: file.type || "application/octet-stream",
+        contentB64: b64,
+      });
+    }
+    return out;
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        These notes live on the event record — pinned, categorized, not a side document.
+        These notes live on the event record — pinned, categorized, not a side document. Drop multiple files on the note.
       </p>
       <form
         className="space-y-2 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
         onSubmit={(e) => {
           e.preventDefault();
           const html = sanitizeNoteHtml(body);
-          if (!notePlain(html)) return;
-          void addEventNote({
-            data: { dealId, body: html, category, pinned: pin, authorId: memberId },
-          }).then(() => {
-            setBody("");
-            setPin(false);
-            setEditorKey((k) => k + 1);
-            toast.success("Note on the event");
-            refresh();
-          });
+          if (!notePlain(html) && pending.length === 0) return;
+          setBusy(true);
+          void encodeFiles(pending)
+            .then((files) =>
+              addEventNote({
+                data: { dealId, body: html || "<p></p>", category, pinned: pin, authorId: memberId, files },
+              }),
+            )
+            .then((r) => {
+              if (!r.ok) toast.error("Could not save note");
+              else toast.success(pending.length ? `Note with ${pending.length} file${pending.length === 1 ? "" : "s"}` : "Note on the event");
+              setBody("");
+              setPin(false);
+              setPending([]);
+              setEditorKey((k) => k + 1);
+              refresh();
+            })
+            .finally(() => setBusy(false));
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -908,7 +976,7 @@ function EventNotesPanel({ dealId, memberId }: { dealId: number; memberId: numbe
             <input type="checkbox" checked={pin} onChange={(e) => setPin(e.target.checked)} />
             Pin to event
           </label>
-          <Button type="submit" size="sm" disabled={!notePlain(body)}>
+          <Button type="submit" size="sm" disabled={busy || (!notePlain(body) && pending.length === 0)}>
             Add note
           </Button>
         </div>
@@ -918,6 +986,7 @@ function EventNotesPanel({ dealId, memberId }: { dealId: number; memberId: numbe
           onChange={setBody}
           placeholder="Load-in, power, talent, holds…"
         />
+        <NoteFilePicker files={pending} onChange={setPending} />
       </form>
       <div className="flex flex-wrap gap-1">
         <Button size="sm" variant={filter === "all" ? "secondary" : "ghost"} onClick={() => setFilter("all")}>
@@ -1002,10 +1071,117 @@ function EventNotesPanel({ dealId, memberId }: { dealId: number; memberId: numbe
             ) : (
               <NoteHtml html={n.body} className="mt-2" />
             )}
+            <NoteAttachments
+              files={n.files ?? []}
+              onAdd={(list) => {
+                setBusy(true);
+                void encodeFiles(list)
+                  .then((files) => attachNoteFiles({ data: { noteId: n.id, dealId, authorId: memberId, files } }))
+                  .then((r) => {
+                    if (!r.ok) toast.error("Could not attach");
+                    else toast.success(`${r.attached} file${r.attached === 1 ? "" : "s"} on the note`);
+                    refresh();
+                  })
+                  .finally(() => setBusy(false));
+              }}
+            />
           </li>
         ))}
         {rows.length === 0 && <p className="text-sm text-muted-foreground">No event notes in this category.</p>}
       </ul>
+    </div>
+  );
+}
+
+function NoteFilePicker({ files, onChange }: { files: File[]; onChange: (next: File[]) => void }) {
+  return (
+    <div className="space-y-2">
+      <label className="inline-flex">
+        <input
+          type="file"
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            const extra = [...(e.target.files ?? [])];
+            if (!extra.length) return;
+            onChange([...files, ...extra].slice(0, 12));
+            e.target.value = "";
+          }}
+        />
+        <Button type="button" size="sm" variant="secondary" asChild>
+          <span>
+            <Paperclip className="size-3.5" />
+            Attach files
+          </span>
+        </Button>
+      </label>
+      {files.length > 0 && (
+        <ul className="space-y-1">
+          {files.map((f, i) => (
+            <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-md bg-secondary px-2 py-1.5 text-xs">
+              <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{f.name}</span>
+              <span className="text-muted-foreground">{formatBytes(f.size)}</span>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => onChange(files.filter((_, idx) => idx !== i))}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function NoteAttachments({
+  files,
+  onAdd,
+}: {
+  files: { id: number; name: string; sizeBytes: number; mime: string }[];
+  onAdd: (list: File[]) => void;
+}) {
+  return (
+    <div className="mt-3 space-y-1">
+      {files.map((f) => (
+        <div key={f.id} className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5 text-xs">
+          <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+          <button
+            type="button"
+            className="min-w-0 flex-1 truncate text-left hover:underline"
+            onClick={() =>
+              downloadPortalFile({ data: { id: f.id } }).then((r) => {
+                if (r.ok) saveBase64File(r.filename, r.contentB64, r.mime);
+                else toast.error("Download blocked");
+              })
+            }
+          >
+            {f.name}
+          </button>
+          <span className="text-muted-foreground">{formatBytes(f.sizeBytes)}</span>
+        </div>
+      ))}
+      <label className="inline-flex">
+        <input
+          type="file"
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            const extra = [...(e.target.files ?? [])];
+            if (extra.length) onAdd(extra);
+            e.target.value = "";
+          }}
+        />
+        <Button type="button" size="sm" variant="ghost" asChild>
+          <span>
+            <Paperclip className="size-3.5" />
+            Add files
+          </span>
+        </Button>
+      </label>
     </div>
   );
 }

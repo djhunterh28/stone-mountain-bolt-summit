@@ -30,6 +30,10 @@ function mapFile(r: Record<string, unknown>) {
     tenantId: r.tenant_id == null ? null : Number(r.tenant_id),
     projectId: r.project_id == null ? null : Number(r.project_id),
     projectName: r.project_name ? String(r.project_name) : null,
+    dealId: r.deal_id == null ? null : Number(r.deal_id),
+    dealTitle: r.deal_title ? String(r.deal_title) : null,
+    taskItemId: r.task_item_id == null ? null : Number(r.task_item_id),
+    taskTitle: r.task_title ? String(r.task_title) : null,
     folder: String(r.folder),
     name: String(r.name),
     mime: String(r.mime),
@@ -379,22 +383,81 @@ export const toggleProjectNote = createServerFn({ method: "POST" })
 
 export const listPortalFiles = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .validator((input: { q?: string; folder?: string; projectId?: number } = {}) => input)
+  .validator((input: { q?: string; folder?: string; projectId?: number; dealId?: number } = {}) => input)
   .handler(async ({ context, data }) => {
     const p = await me(context.userId);
     const sql = await getSql();
     const tid = effectiveTenantId(p);
-    const rows = await sql.query(
-      `select f.*, pr.name as project_name
-       from portal_files f left join projects pr on pr.id = f.project_id
-       where ($1::int is null or f.tenant_id = $1)
-         and ($2::text is null or f.folder = $2)
-         and ($3::int is null or f.project_id = $3)
-         and ($4::text is null or f.name ilike '%' || $4 || '%')
-       order by f.created_at desc`,
-      [tid, data.folder ?? null, data.projectId ?? null, data.q ?? null],
+    let rows: Record<string, unknown>[] = [];
+    try {
+      rows = await sql.query(
+        `select f.*, pr.name as project_name, d.title as deal_title, ti.title as task_title
+         from portal_files f
+         left join projects pr on pr.id = f.project_id
+         left join deals d on d.id = f.deal_id
+         left join task_items ti on ti.id = f.task_item_id
+         where ($1::int is null or f.tenant_id = $1)
+           and ($2::text is null or f.folder = $2)
+           and ($3::int is null or f.project_id = $3)
+           and ($4::int is null or f.deal_id = $4)
+           and (
+             $5::text is null
+             or f.name ilike '%' || $5 || '%'
+             or coalesce(d.title, '') ilike '%' || $5 || '%'
+             or coalesce(pr.name, '') ilike '%' || $5 || '%'
+             or coalesce(ti.title, '') ilike '%' || $5 || '%'
+           )
+         order by f.created_at desc`,
+        [tid, data.folder ?? null, data.projectId ?? null, data.dealId ?? null, data.q ?? null],
+      );
+    } catch {
+      rows = await sql.query(
+        `select f.*, pr.name as project_name
+         from portal_files f left join projects pr on pr.id = f.project_id
+         where ($1::int is null or f.tenant_id = $1)
+           and ($2::text is null or f.folder = $2)
+           and ($3::int is null or f.project_id = $3)
+           and ($4::text is null or f.name ilike '%' || $4 || '%')
+         order by f.created_at desc`,
+        [tid, data.folder ?? null, data.projectId ?? null, data.q ?? null],
+      );
+    }
+    const mapped = rows.map(mapFile);
+    const seen = new Set(mapped.filter((m) => m.dealId).map((m) => `${m.dealId}::${m.name}`));
+    const crm = await sql.query(
+      `select f.id, f.entity_id, f.name, f.kind, f.size_kb, f.created_at, d.title as deal_title
+       from files f
+       join deals d on d.id = f.entity_id
+       where f.entity_type = 'deal'`,
     );
-    return rows.map(mapFile);
+    for (const f of crm) {
+      const dealId = Number(f.entity_id);
+      const name = String(f.name);
+      if (seen.has(`${dealId}::${name}`)) continue;
+      if (data.dealId && data.dealId !== dealId) continue;
+      if (data.folder && data.folder !== "deals" && data.folder !== "all") continue;
+      if (data.q && !`${name} ${f.deal_title}`.toLowerCase().includes(data.q.toLowerCase())) continue;
+      mapped.push({
+        id: -Number(f.id),
+        tenantId: null,
+        projectId: null,
+        projectName: null,
+        dealId,
+        dealTitle: String(f.deal_title),
+        taskItemId: null,
+        taskTitle: null,
+        folder: "deals",
+        name,
+        mime: "application/octet-stream",
+        sizeBytes: Math.max(1, Number(f.size_kb)) * 1024,
+        sha256: null,
+        driveId: null,
+        shared: true,
+        createdAt: iso(f.created_at) ?? "",
+      });
+    }
+    mapped.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return mapped;
   });
 
 export const uploadPortalFile = createServerFn({ method: "POST" })
@@ -406,6 +469,8 @@ export const uploadPortalFile = createServerFn({ method: "POST" })
       mime?: string;
       folder?: string;
       projectId?: number;
+      dealId?: number;
+      taskItemId?: number;
       contentB64?: string;
     }) => input,
   )
@@ -423,10 +488,29 @@ export const uploadPortalFile = createServerFn({ method: "POST" })
     }
     const sha = hashSha(`${data.name}:${data.sizeBytes}:${Date.now()}`);
     const ins = await sql.query(
-      `insert into portal_files (tenant_id, project_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-      [tid, data.projectId ?? null, data.folder ?? "files", data.name, data.mime ?? "application/octet-stream", data.sizeBytes, sha, `drv-${sha.slice(0, 8)}`, p.email],
+      `insert into portal_files (tenant_id, project_id, deal_id, task_item_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+      [
+        tid,
+        data.projectId ?? null,
+        data.dealId ?? null,
+        data.taskItemId ?? null,
+        data.folder ?? (data.dealId ? "deals" : data.taskItemId ? "tasks" : "files"),
+        data.name,
+        data.mime ?? "application/octet-stream",
+        data.sizeBytes,
+        sha,
+        `drv-${sha.slice(0, 8)}`,
+        p.email,
+      ],
     );
+    if (data.dealId) {
+      await sql.query(
+        `insert into files (entity_type, entity_id, name, kind, size_kb, uploaded_by)
+         values ('deal', $1, $2, 'file', $3, (select id from members where email = $4 limit 1))`,
+        [data.dealId, data.name, Math.max(1, Math.round(data.sizeBytes / 1024)), p.email],
+      );
+    }
     if (tid) await sql.query(`update tenants set used_mb = used_mb + $2 where id = $1`, [tid, data.sizeBytes / 1_000_000]);
     await writeAudit(p, "file.upload", data.name);
     return { ok: true as const, id: Number(ins[0].id), sha };
@@ -439,7 +523,16 @@ export const downloadPortalFile = createServerFn({ method: "POST" })
     const p = await me(context.userId);
     const sql = await getSql();
     const rows = await sql.query(`select * from portal_files where id = $1`, [data.id]);
-    const f = rows[0];
+    let f = rows[0];
+    if (!f && data.id < 0) {
+      const crm = await sql.query(`select * from files where id = $1`, [-data.id]);
+      const c = crm[0];
+      if (c) {
+        await writeAudit(p, "file.download", String(c.name));
+        const body = `NORTHLINE FILE PROXY\n${c.name}\nDeal ${c.entity_id}\nDisposition: attachment\n`;
+        return { ok: true as const, filename: String(c.name), mime: "application/octet-stream", contentB64: toB64(body) };
+      }
+    }
     if (!f) return { ok: false as const, error: "Not found" };
     const tid = effectiveTenantId(p);
     if (tid && Number(f.tenant_id) !== tid && !isStaff(p)) return { ok: false as const, error: "Forbidden" };
@@ -531,24 +624,58 @@ export const listTaskLists = createServerFn({ method: "GET" })
     const p = await me(context.userId);
     const sql = await getSql();
     const tid = effectiveTenantId(p);
-    const lists = tid
-      ? await sql.query(`select * from task_lists where tenant_id = $1 order by id`, [tid])
-      : await sql.query(`select * from task_lists order by id`);
+    let lists: Record<string, unknown>[] = [];
+    try {
+      lists = tid
+        ? await sql.query(`select * from task_lists where tenant_id = $1 order by archived_at nulls first, id`, [tid])
+        : await sql.query(`select * from task_lists order by archived_at nulls first, id`);
+    } catch {
+      lists = tid
+        ? await sql.query(`select * from task_lists where tenant_id = $1 order by id`, [tid])
+        : await sql.query(`select * from task_lists order by id`);
+    }
     const items = await sql.query(`select * from task_items order by id`);
+    let files: Record<string, unknown>[] = [];
+    try {
+      files = await sql.query(
+        `select id, task_item_id, name, size_bytes, mime from portal_files where task_item_id is not null order by id`,
+      );
+    } catch {
+      files = [];
+    }
     return lists.map((l) => ({
       id: Number(l.id),
       name: String(l.name),
       projectId: l.project_id == null ? null : Number(l.project_id),
+      archivedAt: l.archived_at ? iso(l.archived_at) : null,
       items: items
         .filter((i) => Number(i.list_id) === Number(l.id))
-        .map((i) => ({ id: Number(i.id), title: String(i.title), done: Boolean(i.done) })),
+        .map((i) => ({
+          id: Number(i.id),
+          title: String(i.title),
+          done: Boolean(i.done),
+          files: files
+            .filter((f) => Number(f.task_item_id) === Number(i.id))
+            .map((f) => ({
+              id: Number(f.id),
+              name: String(f.name),
+              sizeBytes: Number(f.size_bytes),
+              mime: String(f.mime ?? "application/octet-stream"),
+            })),
+        })),
     }));
   });
 
 export const mutateTask = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(
-    (input: { op: "addList" | "delList" | "addItem" | "toggle" | "delItem"; id?: number; name?: string; title?: string; listId?: number }) => input,
+    (input: {
+      op: "addList" | "archiveList" | "restoreList" | "delList" | "addItem" | "toggle" | "delItem";
+      id?: number;
+      name?: string;
+      title?: string;
+      listId?: number;
+    }) => input,
   )
   .handler(async ({ context, data }) => {
     const p = await me(context.userId);
@@ -556,6 +683,10 @@ export const mutateTask = createServerFn({ method: "POST" })
     const tid = effectiveTenantId(p);
     if (data.op === "addList") {
       await sql.query(`insert into task_lists (tenant_id, name) values ($1,$2)`, [tid, data.name ?? "Checklist"]);
+    } else if (data.op === "archiveList" && data.id) {
+      await sql.query(`update task_lists set archived_at = now() where id = $1`, [data.id]);
+    } else if (data.op === "restoreList" && data.id) {
+      await sql.query(`update task_lists set archived_at = null where id = $1`, [data.id]);
     } else if (data.op === "delList" && data.id) {
       await sql.query(`delete from task_lists where id = $1`, [data.id]);
     } else if (data.op === "addItem" && data.listId) {
@@ -566,6 +697,49 @@ export const mutateTask = createServerFn({ method: "POST" })
       await sql.query(`delete from task_items where id = $1`, [data.id]);
     }
     return { ok: true };
+  });
+
+export const attachTaskFiles = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      itemId: number;
+      files: { name: string; sizeBytes: number; mime?: string; contentB64?: string }[];
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const p = await me(context.userId);
+    const files = (data.files ?? []).slice(0, 12);
+    if (!files.length) return { ok: false as const, error: "No files" };
+    const sql = await getSql();
+    const item = await sql.query(
+      `select i.id, l.tenant_id, l.project_id from task_items i join task_lists l on l.id = i.list_id where i.id = $1`,
+      [data.itemId],
+    );
+    const row = item[0];
+    if (!row) return { ok: false as const, error: "Task not found" };
+    const tid = row.tenant_id == null ? effectiveTenantId(p) : Number(row.tenant_id);
+    const projectId = row.project_id == null ? null : Number(row.project_id);
+    for (const file of files) {
+      const sha = hashSha(`task-${data.itemId}:${file.name}:${file.sizeBytes}:${Date.now()}`);
+      await sql.query(
+        `insert into portal_files (tenant_id, project_id, task_item_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
+         values ($1,$2,$3,'tasks',$4,$5,$6,$7,$8,$9)`,
+        [
+          tid,
+          projectId,
+          data.itemId,
+          file.name,
+          file.mime ?? "application/octet-stream",
+          file.sizeBytes,
+          sha,
+          `drv-${sha.slice(0, 8)}`,
+          p.email,
+        ],
+      );
+    }
+    await writeAudit(p, "file.upload", `${files.length} on task ${data.itemId}`);
+    return { ok: true as const, attached: files.length };
   });
 
 export const listBookmarks = createServerFn({ method: "GET" })

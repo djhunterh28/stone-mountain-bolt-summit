@@ -348,6 +348,12 @@ export const addFileMeta = createServerFn({ method: "POST" })
     const sql = await getSql();
     await sql`insert into files (entity_type, entity_id, name, kind, size_kb, uploaded_by)
       values (${data.entityType}, ${data.entityId}, ${data.name}, ${"file"}, ${Math.round(40 + Math.random() * 800)}, ${data.uploadedBy})`;
+    if (data.entityType === "deal") {
+      const sha = `deal-${data.entityId}-${Date.now()}`;
+      await sql`insert into portal_files (tenant_id, deal_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
+        values (null, ${data.entityId}, ${"deals"}, ${data.name}, ${"application/octet-stream"}, ${120 * 1024}, ${sha}, ${`drv-${sha.slice(0, 12)}`},
+          (select email from members where id = ${data.uploadedBy} limit 1))`;
+    }
     return { ok: true };
   });
 

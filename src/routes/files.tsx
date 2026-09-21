@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/app-shell";
@@ -58,7 +58,7 @@ function FilesPage() {
     <div className="pb-12">
       <PageHeader
         title="Files"
-        subtitle="All project files, task attachments, and digital assets. Downloads are proxied — Drive URLs never leave the house."
+        subtitle="Deal attachments, project files, and Drive assets. Every deal upload lands here with a link back to the show."
         actions={
           <>
             <Button
@@ -98,6 +98,9 @@ function FilesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All folders</SelectItem>
+            <SelectItem value="deals">Deals</SelectItem>
+            <SelectItem value="notes">Note attachments</SelectItem>
+            <SelectItem value="tasks">Tasks</SelectItem>
             <SelectItem value="files">Project files</SelectItem>
             <SelectItem value="billing">Billing</SelectItem>
             <SelectItem value="digital">Digital assets</SelectItem>
@@ -117,6 +120,8 @@ function FilesPage() {
               <th className="px-4 py-2 sm:px-6" />
               <th className="px-2 py-2">Name</th>
               <th className="px-2 py-2">Folder</th>
+              <th className="px-2 py-2">Deal</th>
+              <th className="px-2 py-2">Task</th>
               <th className="px-2 py-2">Project</th>
               <th className="px-2 py-2 text-right">Size</th>
               <th className="px-4 py-2 sm:px-6">Added</th>
@@ -151,6 +156,20 @@ function FilesPage() {
                 <td className="px-2 py-2">
                   <Badge variant="outline">{f.folder}</Badge>
                 </td>
+                <td className="px-2 py-2">
+                  {f.dealId ? (
+                    <Link
+                      to="/deals/$dealId"
+                      params={{ dealId: String(f.dealId) }}
+                      className="text-primary hover:underline"
+                    >
+                      {f.dealTitle ?? `Deal ${f.dealId}`}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-2 py-2 text-muted-foreground">{f.taskTitle ?? "—"}</td>
                 <td className="px-2 py-2 text-muted-foreground">{f.projectName ?? "—"}</td>
                 <td className="px-2 py-2 text-right font-mono tabular-nums">{formatBytes(f.sizeBytes)}</td>
                 <td className="px-4 py-2 text-muted-foreground sm:px-6">

@@ -446,7 +446,7 @@ export const listEventNotes = createServerFn({ method: "GET" })
   .validator((input: { dealId: number }) => input)
   .handler(async ({ data }) => {
     const sql = await getSql();
-    return (
+    const rows = (
       await sql.query(
         `select n.*, m.name as author from event_notes n left join members m on m.id = n.author_id where n.deal_id = $1 order by n.pinned desc, n.id desc`,
         [data.dealId],
@@ -458,21 +458,120 @@ export const listEventNotes = createServerFn({ method: "GET" })
       body: String(r.body),
       author: r.author == null ? null : String(r.author),
       createdAt: iso(r.created_at) ?? "",
+      files: [] as { id: number; name: string; sizeBytes: number; mime: string }[],
     }));
+    const ids = rows.map((n) => n.id);
+    if (ids.length) {
+      let attached: Record<string, unknown>[] = [];
+      try {
+        attached = await sql.query(
+          `select id, note_id, name, size_bytes, mime from portal_files where note_id = any($1::int[]) order by id`,
+          [ids],
+        );
+      } catch {
+        attached = [];
+      }
+      const byNote = new Map<number, { id: number; name: string; sizeBytes: number; mime: string }[]>();
+      for (const f of attached) {
+        const nid = Number(f.note_id);
+        const list = byNote.get(nid) ?? [];
+        list.push({
+          id: Number(f.id),
+          name: String(f.name),
+          sizeBytes: Number(f.size_bytes),
+          mime: String(f.mime ?? "application/octet-stream"),
+        });
+        byNote.set(nid, list);
+      }
+      for (const n of rows) n.files = byNote.get(n.id) ?? [];
+    }
+    return rows;
   });
 
 export const addEventNote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { dealId: number; body: string; category: string; pinned?: boolean; authorId?: number }) => input)
+  .validator(
+    (input: {
+      dealId: number;
+      body: string;
+      category: string;
+      pinned?: boolean;
+      authorId?: number;
+      files?: { name: string; sizeBytes: number; mime?: string; contentB64?: string }[];
+    }) => input,
+  )
   .handler(async ({ data }) => {
-    const body = data.body.trim();
-    if (!body) return { ok: false as const };
-    await (await getSql()).query(
-      `insert into event_notes (deal_id, body, category, pinned, author_id) values ($1,$2,$3,$4,$5)`,
+    const body = data.body.trim() || "<p></p>";
+    const files = (data.files ?? []).slice(0, 12);
+    if (!body.replace(/<[^>]+>/g, "").trim() && files.length === 0) return { ok: false as const };
+    const sql = await getSql();
+    const ins = await sql.query(
+      `insert into event_notes (deal_id, body, category, pinned, author_id) values ($1,$2,$3,$4,$5) returning id`,
       [data.dealId, body, data.category, Boolean(data.pinned), data.authorId ?? 1],
     );
-    return { ok: true as const };
+    const noteId = Number(ins[0]?.id);
+    await attachFilesToNote(sql, { noteId, dealId: data.dealId, authorId: data.authorId, files });
+    return { ok: true as const, id: noteId, attached: files.length };
   });
+
+export const attachNoteFiles = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      noteId: number;
+      dealId: number;
+      authorId?: number;
+      files: { name: string; sizeBytes: number; mime?: string; contentB64?: string }[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const files = (data.files ?? []).slice(0, 12);
+    if (!files.length) return { ok: false as const };
+    const sql = await getSql();
+    await attachFilesToNote(sql, data);
+    return { ok: true as const, attached: files.length };
+  });
+
+async function attachFilesToNote(
+  sql: Awaited<ReturnType<typeof getSql>>,
+  data: {
+    noteId: number;
+    dealId: number;
+    authorId?: number;
+    files: { name: string; sizeBytes: number; mime?: string; contentB64?: string }[];
+  },
+) {
+  for (const file of data.files.slice(0, 12)) {
+    const sha = `note-${data.noteId}-${file.name}-${file.sizeBytes}`;
+    try {
+      await sql.query(
+        `insert into portal_files (tenant_id, deal_id, note_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
+         values (null, $1, $2, 'notes', $3, $4, $5, $6, $7, (select email from members where id = $8 limit 1))`,
+        [
+          data.dealId,
+          data.noteId,
+          file.name,
+          file.mime ?? "application/octet-stream",
+          file.sizeBytes,
+          sha,
+          `drv-${sha.slice(0, 12)}`,
+          data.authorId ?? 1,
+        ],
+      );
+    } catch {
+      await sql.query(
+        `insert into portal_files (tenant_id, folder, name, mime, size_bytes, sha256, drive_id, uploaded_by)
+         values (null, 'notes', $1, $2, $3, $4, $5, (select email from members where id = $6 limit 1))`,
+        [file.name, file.mime ?? "application/octet-stream", file.sizeBytes, sha, `drv-${sha.slice(0, 12)}`, data.authorId ?? 1],
+      );
+    }
+    await sql.query(
+      `insert into files (entity_type, entity_id, name, kind, size_kb, uploaded_by)
+       values ('deal', $1, $2, 'note', $3, $4)`,
+      [data.dealId, file.name, Math.max(1, Math.round(file.sizeBytes / 1024)), data.authorId ?? 1],
+    );
+  }
+}
 
 export const updateEventNote = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

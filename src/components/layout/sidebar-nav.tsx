@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -26,7 +26,6 @@ import {
   Monitor,
   PenLine,
   Radar,
-  Send,
   Settings,
   Smartphone,
   Sparkles,
@@ -46,12 +45,16 @@ import { useUi } from "@/lib/crm/store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-export type NavItem = { href: string; label: string; icon: LucideIcon };
+export type NavChild = { href: string; label: string; search?: { tab?: string } };
+export type NavItem = { href: string; label: string; icon: LucideIcon; children?: NavChild[] };
 
 export const STAFF_PRIMARY: NavItem[] = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/", label: "Pipeline", icon: Kanban },
-  { href: "/leads", label: "Leads", icon: Inbox },
+  { href: "/leads", label: "Leads", icon: Inbox, children: [
+    { href: "/leads", label: "Inbox" },
+    { href: "/leads", label: "LeadBooster", search: { tab: "booster" } },
+  ] },
   { href: "/lifecycle", label: "Lifecycle", icon: Waypoints },
   { href: "/pulse", label: "Pulse", icon: Radar },
   { href: "/registry", label: "Registry", icon: Users },
@@ -67,7 +70,6 @@ export const STAFF_MORE: NavItem[] = [
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/mail", label: "Mail", icon: Mail },
   { href: "/client-portal", label: "Client portal", icon: KeyRound },
-  { href: "/smtp", label: "SMTP", icon: Send },
   { href: "/inbox", label: "Unified inbox", icon: MessageSquare },
   { href: "/sms", label: "SMS / QUO", icon: Smartphone },
   { href: "/broadcasts", label: "Broadcasts", icon: Megaphone },
@@ -76,7 +78,6 @@ export const STAFF_MORE: NavItem[] = [
   { href: "/reviews", label: "Reviews", icon: Star },
   { href: "/handoff", label: "Hand-off", icon: Handshake },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/leadbooster", label: "LeadBooster", icon: Bot },
   { href: "/chatbot", label: "Chatbot", icon: Bot },
   { href: "/forms", label: "Forms", icon: FormInput },
   { href: "/prospector", label: "Prospector", icon: UserPlus },
@@ -292,7 +293,9 @@ function NavRow({
   onDrop: () => void;
 }) {
   const Icon = item.icon;
+  const search = useRouterState({ select: (s) => s.location.search as { tab?: string } });
   const active = isActive(pathname, item.href);
+  const kids = item.children ?? [];
   return (
     <div
       onDragOver={(e) => {
@@ -348,6 +351,28 @@ function NavRow({
           <Star className={cn("size-3.5", pinned && "fill-current")} />
         </button>
       </Link>
+      {kids.length > 0 && !compact && (
+        <div className="mb-1 ml-6 mt-0.5 space-y-0.5 border-l border-border pl-2">
+          {kids.map((child) => {
+            const childActive =
+              pathname === child.href && (child.search?.tab ? search.tab === child.search.tab : !search.tab);
+            return (
+              <Link
+                key={`${child.href}:${child.search?.tab ?? "root"}`}
+                to={child.href as "/"}
+                search={(child.search ?? { tab: undefined }) as never}
+                onClick={() => useUi.getState().setSidebarOpen(false)}
+                className={cn(
+                  "flex min-h-8 items-center rounded-md px-2 text-xs transition-colors",
+                  childActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-primary/8 hover:text-foreground",
+                )}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

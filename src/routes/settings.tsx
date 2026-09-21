@@ -27,6 +27,7 @@ import { SequencesPanel } from "@/components/crm/sequences-panel";
 import { PortalDomainDesk } from "@/components/crm/portal-domain-panel";
 import { DevelopersPanel } from "@/components/crm/developers-panel";
 import { IntegrationsDesk } from "@/components/crm/integrations-desk";
+import { SmtpPanel } from "@/components/crm/smtp-panel";
 import { STAFF_NAV, catalogFor } from "@/components/layout/sidebar-nav";
 import { getNavPrefs, insertBefore, mergeNavLayout, saveNavPrefs } from "@/lib/crm/prefs";
 import { useUi } from "@/lib/crm/store";
@@ -188,6 +189,7 @@ function SettingsPage() {
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
             <TabsTrigger value="domain">Sending domain</TabsTrigger>
+            <TabsTrigger value="smtp">SMTP</TabsTrigger>
             <TabsTrigger value="automations">Automations</TabsTrigger>
             <TabsTrigger value="sequences">Sequences</TabsTrigger>
             <TabsTrigger value="portal">Portal domain</TabsTrigger>
@@ -448,6 +450,9 @@ function SettingsPage() {
           </TabsContent>
           <TabsContent value="domain" className="mt-4">
             <SendingDomainPanel />
+          </TabsContent>
+          <TabsContent value="smtp" className="mt-4">
+            <SmtpPanel />
           </TabsContent>
           <TabsContent value="automations" className="mt-4">
             <AutomationsPanel />

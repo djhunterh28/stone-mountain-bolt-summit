@@ -39,6 +39,7 @@ export type MileageTrip = {
   driverId: number | null;
   driverName: string | null;
   dealId: number | null;
+  dealTitle: string | null;
   originId: number;
   originName: string;
   destId: number;
@@ -103,6 +104,7 @@ function mapTrip(r: Record<string, unknown>): MileageTrip {
     driverId: r.driver_id == null ? null : Number(r.driver_id),
     driverName: r.driver_name == null ? null : String(r.driver_name),
     dealId: r.deal_id == null ? null : Number(r.deal_id),
+    dealTitle: r.deal_title == null ? null : String(r.deal_title),
     originId: Number(r.origin_id),
     originName: String(r.origin_name),
     destId: Number(r.dest_id),
@@ -130,12 +132,13 @@ export function tripCost(t: Pick<MileageTrip, "miles" | "ratePerMile" | "mpg" | 
 }
 
 const TRIP_SQL = `select t.*, v.name as vehicle_name, v.kind as vehicle_kind, v.mpg, v.rate_per_mile, v.fuel, v.reimburse,
-  m.name as driver_name, o.name as origin_name, d.name as dest_name
+  m.name as driver_name, o.name as origin_name, d.name as dest_name, deal.title as deal_title
   from mileage_trips t
   left join vehicles v on v.id = t.vehicle_id
   left join members m on m.id = t.driver_id
   join travel_places o on o.id = t.origin_id
-  join travel_places d on d.id = t.dest_id`;
+  join travel_places d on d.id = t.dest_id
+  left join deals deal on deal.id = t.deal_id`;
 
 export const getTravelDesk = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -211,6 +214,27 @@ export const createTrip = createServerFn({ method: "POST" })
       ],
     );
     return { ok: true as const, miles };
+  });
+
+export const getDealTravel = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((input: { dealId: number }) => input)
+  .handler(async ({ data }) => {
+    const sql = await getSql();
+    const vehicles = (await sql`select * from vehicles where active = true order by id`).map(mapVehicle);
+    const places = (await sql`select * from travel_places order by kind desc, name`).map(mapPlace);
+    const trips = (await sql.query(`${TRIP_SQL} where t.deal_id = $1 order by t.traveled_on desc, t.id desc`, [data.dealId])).map(mapTrip);
+    const deal = (await sql.query(`select id, title, venue from deals where id = $1`, [data.dealId]))[0];
+    const venueName = deal?.venue ? String(deal.venue) : null;
+    const dest = venueName ? places.find((p) => p.name === venueName) ?? null : null;
+    return {
+      vehicles,
+      places,
+      trips,
+      venueName,
+      destId: dest?.id ?? null,
+      dealTitle: deal ? String(deal.title) : null,
+    };
   });
 
 export const setTripStatus = createServerFn({ method: "POST" })
