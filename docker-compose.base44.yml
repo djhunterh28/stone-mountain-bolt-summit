@@ -1,0 +1,34 @@
+# Base44 dev environment for Northline (Vite + TanStack Start).
+# Runs the app from the cloned source with live reload. No external services
+# needed — the app uses PGLite (in-process Postgres WASM) when DATABASE_URL is
+# unset, and auth is disabled (VITE_AUTH_ENABLED=false) so the dev user fallback
+# is used instead of the Grok OAuth broker.
+services:
+  app:
+    image: node:22
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "3000:8080"
+    environment:
+      # Auth off — the shipped default; uses the shared dev user id instead of
+      # the Grok OAuth broker (which only accepts *.grok-sandbox.com callbacks).
+      - VITE_AUTH_ENABLED=false
+      # Vite >= 6.1 appends this to allowedHosts so the preview proxy host is
+      # accepted. The platform sets it; passing it bare forwards the host value.
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      # Bind mounts often need polling for file-watch events to fire.
+      - CHOKIDAR_USEPOLLING=true
+    command: sh -c "npm install --no-audit --no-fund && npm run dev"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 300s
+    restart: unless-stopped

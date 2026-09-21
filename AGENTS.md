@@ -1,3 +1,25 @@
+<!-- Base44 dev environment notes (prepend; the rest of this file is the
+     original Grok Build workspace contract and still applies to the app code) -->
+
+## Base44 setup
+
+- **Run:** `docker compose -f docker-compose.base44.yml up -d` — single `node:22`
+  service, source bind-mounted at `/workspace`, port `3000:8080`.
+- **No external services needed.** The app uses PGLite (in-process Postgres WASM)
+  when `DATABASE_URL` is unset — migrations auto-apply at dev-server startup via
+  the `pgliteBootstrapPlugin` in `vite.config.ts`.
+- **Auth is disabled** (`VITE_AUTH_ENABLED=false` in compose env) — the Grok
+  OAuth broker only accepts `*.grok-sandbox.com` callbacks, which don't work in
+  Base44. With auth off, the app uses the shared `DEV_USER_ID` fallback. Do NOT
+  set `DATABASE_URL` while auth is disabled (the app throws fail-closed).
+- **Vite host allowlist** is handled via `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`
+  (passed through from the platform env). Vite 8 appends it to `allowedHosts`.
+- **Verify:** `curl -sf http://127.0.0.1:3000/` should return the Northline CRM
+  HTML. Container healthcheck uses node `fetch` against `127.0.0.1:8080`.
+- **No secrets required** — everything runs locally with PGLite + dev user.
+
+---
+
 # App Builder Workspace
 
 **The single source of truth** for the App Builder sandbox contract. You are
